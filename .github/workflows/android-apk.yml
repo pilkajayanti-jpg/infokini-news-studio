@@ -1,3 +1,4 @@
+
 name: Build InfoKini Android APK
 
 on:
@@ -28,6 +29,22 @@ jobs:
           unzip -q InfoKini_News_Studio_Project.zip -d extracted
           cp -R extracted/infokini_news_studio/. .
 
+      - name: Paksa target Java dan Kotlin ke 17
+        run: |
+          cat >> app/build.gradle.kts <<'EOF'
+
+          tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
+              sourceCompatibility = "17"
+              targetCompatibility = "17"
+          }
+
+          tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+          EOF
+
       - name: Siapkan Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -41,4 +58,3 @@ jobs:
         with:
           name: InfoKini-News-Studio-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-          
