@@ -44,6 +44,7 @@ fun InfoKiniStudio() {
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
     var live by remember { mutableStateOf(false) }
     var footballMode by remember { mutableStateOf(false) }
+    var sportsNewsMode by remember { mutableStateOf(false) }
     var homeTeam by remember { mutableStateOf("") }
     var awayTeam by remember { mutableStateOf("") }
     var homeScore by remember { mutableStateOf("0") }
@@ -76,6 +77,11 @@ fun InfoKiniStudio() {
                 }
             }
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !footballMode && !sportsNewsMode, onClick = { footballMode = false; sportsNewsMode = false }, label = { Text("Studio Berita") })
+                FilterChip(selected = footballMode, onClick = { footballMode = true; sportsNewsMode = false }, label = { Text("Skor Bola") })
+                FilterChip(selected = sportsNewsMode, onClick = { sportsNewsMode = true; footballMode = false }, label = { Text("Berita Olahraga") })
+            }
             Text("PRATINJAU SIARAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             Column(
                 Modifier.fillMaxWidth().height(220.dp).background(Color(0xFF101827), RoundedCornerShape(12.dp))
@@ -137,6 +143,8 @@ fun InfoKiniStudio() {
                     }
                 }
                 Text("Logo tim dan kompetisi akan disiapkan sebagai aset grafis pada pengembangan overlay berikutnya.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            } else if (sportsNewsMode) {
+                SportsNewsEditor()
             } else {
             Text("EDITOR BERITA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             StudioField("Judul berita", headline, { headline = it }, "Tulis judul berita...")
