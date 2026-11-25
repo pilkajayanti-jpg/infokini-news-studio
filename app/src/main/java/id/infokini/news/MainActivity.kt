@@ -3,6 +3,8 @@ package id.infokini.news
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import android.widget.Toast
 import android.widget.ImageView
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import java.util.Locale
 
 private val Navy = Color(0xFF080D4A)
 private val Cyan = Color(0xFF13BDEB)
@@ -42,6 +45,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun InfoKiniStudio() {
     val context = LocalContext.current
+    val tts = remember { TextToSpeech(context) { } }
+    DisposableEffect(tts) { onDispose { tts.stop(); tts.shutdown() } }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
@@ -111,8 +116,10 @@ fun InfoKiniStudio() {
                         Text("$matchTime  •  $matchStatus", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 } else if (headline.isNotBlank()) {
-                    Text(headline, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp,
-                        modifier = Modifier.fillMaxWidth().background(Navy.copy(alpha = .92f)).padding(10.dp))
+                    Column(Modifier.fillMaxWidth().background(Navy.copy(alpha = .92f)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(headline, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        if (location.isNotBlank()) Text(location, color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
                 Row(Modifier.fillMaxWidth().background(Cyan).padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("INFO KINI", color = Navy, fontWeight = FontWeight.Black, fontSize = 11.sp)
@@ -194,6 +201,34 @@ fun InfoKiniStudio() {
                         update = { view -> view.setImageURI(selectedMedia) },
                         modifier = Modifier.fillMaxWidth().height(220.dp)
                     )
+                }
+            }
+            if (!footballMode && !sportsNewsMode) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        context.getSharedPreferences("infokini_studio", 0).edit()
+                            .putString("headline", headline).putString("ticker", ticker)
+                            .putString("location", location).apply()
+                        Toast.makeText(context, "Draf InfoKini tersimpan di perangkat", Toast.LENGTH_SHORT).show()
+                    }, modifier = Modifier.weight(1f)) { Text("Simpan draf") }
+                    OutlinedButton(onClick = {
+                        val prefs = context.getSharedPreferences("infokini_studio", 0)
+                        headline = prefs.getString("headline", "").orEmpty()
+                        ticker = prefs.getString("ticker", "").orEmpty()
+                        location = prefs.getString("location", "").orEmpty()
+                        Toast.makeText(context, "Draf dimuat", Toast.LENGTH_SHORT).show()
+                    }, modifier = Modifier.weight(1f)) { Text("Muat draf") }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        val shareText = "INFO KINI | infokini.news\n" + headline + "\n" + location + "\n\n" + ticker + "\n\nReporter: Wandi Azis"
+                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareText) }
+                        context.startActivity(Intent.createChooser(send, "Bagikan konten InfoKini"))
+                    }, modifier = Modifier.weight(1f)) { Text("Bagikan") }
+                    OutlinedButton(onClick = {
+                        tts.language = Locale("id", "ID")
+                        tts.speak("$" + "headline. " + ticker, TextToSpeech.QUEUE_FLUSH, null, "infokini-news-script")
+                    }, modifier = Modifier.weight(1f)) { Text("Bacakan naskah") }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
