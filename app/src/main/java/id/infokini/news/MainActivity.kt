@@ -3,6 +3,8 @@ package id.infokini.news
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.ImageView
+import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,6 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 
 private val Navy = Color(0xFF080D4A)
 private val Cyan = Color(0xFF13BDEB)
@@ -37,6 +41,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun InfoKiniStudio() {
+    val context = LocalContext.current
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
@@ -157,6 +162,40 @@ fun InfoKiniStudio() {
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
             ) { Text("PILIH FOTO / VIDEO DARI HP") }
             Text(mediaLabel, color = Color.LightGray, fontSize = 12.sp)
+            if (selectedMedia != null) {
+                val isVideo = context.contentResolver.getType(selectedMedia!!)?.startsWith("video/") == true
+                Text(if (isVideo) "PRATINJAU VIDEO" else "PRATINJAU FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                if (isVideo) {
+                    AndroidView(
+                        factory = { viewContext ->
+                            VideoView(viewContext).apply {
+                                setVideoURI(selectedMedia)
+                                setOnPreparedListener { player -> player.isLooping = true; start() }
+                            }
+                        },
+                        update = { view ->
+                            if (view.tag != selectedMedia.toString()) {
+                                view.tag = selectedMedia.toString()
+                                view.setVideoURI(selectedMedia)
+                                view.setOnPreparedListener { player -> player.isLooping = true; view.start() }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(220.dp)
+                    )
+                } else {
+                    AndroidView(
+                        factory = { viewContext ->
+                            ImageView(viewContext).apply {
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                                setBackgroundColor(android.graphics.Color.BLACK)
+                                setImageURI(selectedMedia)
+                            }
+                        },
+                        update = { view -> view.setImageURI(selectedMedia) },
+                        modifier = Modifier.fillMaxWidth().height(220.dp)
+                    )
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Tampilkan label LIVE", color = Color.White, modifier = Modifier.weight(1f))
                 Switch(checked = live, onCheckedChange = { live = it })
