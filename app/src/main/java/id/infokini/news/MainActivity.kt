@@ -43,6 +43,14 @@ fun InfoKiniStudio() {
     var selectedMedia by remember { mutableStateOf<Uri?>(null) }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
     var live by remember { mutableStateOf(false) }
+    var footballMode by remember { mutableStateOf(false) }
+    var homeTeam by remember { mutableStateOf("") }
+    var awayTeam by remember { mutableStateOf("") }
+    var homeScore by remember { mutableStateOf("0") }
+    var awayScore by remember { mutableStateOf("0") }
+    var competition by remember { mutableStateOf("") }
+    var matchTime by remember { mutableStateOf("00:00") }
+    var matchStatus by remember { mutableStateOf("BELUM DIMULAI") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             selectedMedia = uri
@@ -79,7 +87,19 @@ fun InfoKiniStudio() {
                         modifier = Modifier.background(Navy.copy(alpha = .85f), RoundedCornerShape(4.dp)).padding(7.dp))
                 }
                 Spacer(Modifier.weight(1f))
-                if (headline.isNotBlank()) {
+                if (footballMode) {
+                    Column(Modifier.fillMaxWidth().background(Color(0xFF07152B), RoundedCornerShape(8.dp)).padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(competition.ifBlank { "NAMA KOMPETISI" }, color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceEvenly) {
+                            Text(homeTeam.ifBlank { "TIM A" }, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text("$homeScore - $awayScore", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                            Text(awayTeam.ifBlank { "TIM B" }, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        }
+                        Text("$matchTime  •  $matchStatus", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else if (headline.isNotBlank()) {
                     Text(headline, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp,
                         modifier = Modifier.fillMaxWidth().background(Navy.copy(alpha = .92f)).padding(10.dp))
                 }
@@ -90,10 +110,39 @@ fun InfoKiniStudio() {
                 }
             }
 
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("MODE SIARAN SEPAK BOLA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Aktifkan hanya saat menayangkan pertandingan", color = Color.LightGray, fontSize = 11.sp)
+                }
+                Switch(checked = footballMode, onCheckedChange = { footballMode = it })
+            }
+            if (footballMode) {
+                Text("PENGATURAN SKOR PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                StudioField("Kompetisi / nama pertandingan", competition, { competition = it }, "Contoh: Liga 1 Indonesia")
+                StudioField("Nama tim kandang", homeTeam, { homeTeam = it }, "Nama tim A")
+                StudioField("Skor tim kandang", homeScore, { homeScore = it.filter { ch -> ch.isDigit() }.take(2) }, "0")
+                StudioField("Nama tim tandang", awayTeam, { awayTeam = it }, "Nama tim B")
+                StudioField("Skor tim tandang", awayScore, { awayScore = it.filter { ch -> ch.isDigit() }.take(2) }, "0")
+                StudioField("Waktu pertandingan", matchTime, { matchTime = it }, "Contoh: 45+2'")
+                var expandedStatus by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(onClick = { expandedStatus = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(matchStatus, color = Cyan)
+                    }
+                    DropdownMenu(expanded = expandedStatus, onDismissRequest = { expandedStatus = false }) {
+                        listOf("BELUM DIMULAI", "BABAK PERTAMA", "ISTIRAHAT", "BABAK KEDUA", "TAMBAHAN WAKTU", "ADU PENALTI", "SELESAI").forEach { status ->
+                            DropdownMenuItem(text = { Text(status) }, onClick = { matchStatus = status; expandedStatus = false })
+                        }
+                    }
+                }
+                Text("Logo tim dan kompetisi akan disiapkan sebagai aset grafis pada pengembangan overlay berikutnya.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            } else {
             Text("EDITOR BERITA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             StudioField("Judul berita", headline, { headline = it }, "Tulis judul berita...")
             StudioField("Teks berjalan", ticker, { ticker = it }, "Tulis running text...")
             StudioField("Lokasi berita", location, { location = it }, "Contoh: Cigombong, Kabupaten Bogor")
+            }
             OutlinedButton(
                 onClick = { picker.launch(arrayOf("image/*", "video/*")) },
                 modifier = Modifier.fillMaxWidth(),
@@ -110,7 +159,7 @@ fun InfoKiniStudio() {
                 colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
             ) { Text("PERBARUI PRATINJAU", fontWeight = FontWeight.Black) }
 
-            Text("Catatan versi 2.0: editor dasar dan pratinjau grafis sudah disiapkan. Ekspor MP4, penyuntingan video lanjutan, AI redaktur, TTS, dan siaran langsung masih memerlukan modul serta integrasi berikutnya.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Text("Mode skor sepak bola masih tahap dasar. Logo tim/kompetisi, jam pertandingan otomatis, statistik laga, dan ekspor grafis video memerlukan pengembangan lanjutan. Ekspor MP4, editor video penuh, AI redaktur, TTS, dan siaran langsung juga belum selesai.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
         }
     }
 }
