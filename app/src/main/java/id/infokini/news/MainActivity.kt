@@ -227,7 +227,7 @@ fun InfoKiniStudio() {
                     }, modifier = Modifier.weight(1f)) { Text("Bagikan") }
                     OutlinedButton(onClick = {
                         tts.language = Locale("id", "ID")
-                        tts.speak("$" + "headline. " + ticker, TextToSpeech.QUEUE_FLUSH, null, "infokini-news-script")
+                        tts.speak("$headline. $ticker", TextToSpeech.QUEUE_FLUSH, null, "infokini-news-script")
                     }, modifier = Modifier.weight(1f)) { Text("Bacakan naskah") }
                 }
             }
