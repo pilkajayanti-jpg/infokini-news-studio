@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.Locale
+import java.net.URI
 import kotlinx.coroutines.delay
 
 private val Navy = Color(0xFF080D4A)
@@ -926,7 +927,7 @@ fun InfoKiniStudio() {
             ) { Text("Cari unggahan publik Facebook") }
             StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL sumber pertama (https://...)...")
             StudioField("Tautan sumber pembanding", reporterComparisonSourceUrl, { reporterComparisonSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL sumber independen kedua...")
-            Text("Untuk mengajukan persetujuan, cantumkan dua sumber yang benar-benar berbeda. Dua tautan ke salinan berita yang sama tidak dihitung sebagai verifikasi silang.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            Text("Persetujuan mensyaratkan dua URL valid dari domain berbeda dan catatan fakta. Domain berbeda hanya pemeriksaan awal; redaksi tetap wajib memastikan penerbit benar-benar independen, bukan salinan/sindikasi, serta isi kedua sumber mendukung fakta.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
             StudioField("Fakta dan hasil konfirmasi", reporterFacts, { reporterFacts = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Catat siapa, apa, kapan, di mana, bukti, dan tanggapan...")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = reporterVerified, onCheckedChange = { reporterVerified = it; reporterApproved = false; reporterMaterialAppliedToVideo = false })
@@ -945,8 +946,8 @@ fun InfoKiniStudio() {
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = reporterApproved, onCheckedChange = { checked ->
-                    reporterApproved = checked && reporterVerified && reporterTopic.isNotBlank() && isValidHttpUrl(reporterSourceUrl) && isValidHttpUrl(reporterComparisonSourceUrl) && reporterSourceUrl.trim() != reporterComparisonSourceUrl.trim() && reporterVideoScript.isNotBlank()
-                    if (checked && !reporterApproved) Toast.makeText(context, "Persetujuan memerlukan topik, dua URL sumber berbeda yang valid, verifikasi, dan naskah video.", Toast.LENGTH_LONG).show()
+                    reporterApproved = checked && reporterVerified && reporterTopic.isNotBlank() && reporterFacts.isNotBlank() && isValidIndependentSourcePair(reporterSourceUrl, reporterComparisonSourceUrl) && reporterVideoScript.isNotBlank()
+                    if (checked && !reporterApproved) Toast.makeText(context, "Persetujuan memerlukan topik, fakta, dua domain sumber berbeda, verifikasi redaksi, dan naskah video.", Toast.LENGTH_LONG).show()
                 })
                 Text("Disetujui redaksi untuk diterbitkan / diekspor", color = Color.White, fontSize = 12.sp)
             }
@@ -1288,8 +1289,24 @@ fun InfoKiniStudio() {
 
 
 private fun isValidHttpUrl(value: String): Boolean {
-    val parsed = Uri.parse(value.trim())
-    return (parsed.scheme == "https" || parsed.scheme == "http") && !parsed.host.isNullOrBlank()
+    return try {
+        val parsed = URI(value.trim())
+        (parsed.scheme.equals("https", ignoreCase = true) || parsed.scheme.equals("http", ignoreCase = true)) &&
+            !parsed.host.isNullOrBlank()
+    } catch (_: Exception) {
+        false
+    }
+}
+
+private fun isValidIndependentSourcePair(primary: String, comparison: String): Boolean {
+    if (!isValidHttpUrl(primary) || !isValidHttpUrl(comparison)) return false
+    return try {
+        val primaryHost = URI(primary.trim()).host.lowercase(Locale.ROOT).removePrefix("www.")
+        val comparisonHost = URI(comparison.trim()).host.lowercase(Locale.ROOT).removePrefix("www.")
+        primaryHost != comparisonHost
+    } catch (_: Exception) {
+        false
+    }
 }
 
 private fun openReporterSource(context: android.content.Context, value: String) {
