@@ -275,10 +275,10 @@ fun InfoKiniStudio() {
                     if (title.isNotBlank() || crawl.isNotBlank() || caption.isNotBlank()) {
                         val combined = buildString {
                             if (title.isNotBlank()) append(title)
-                            if (title.isNotBlank() && (crawl.isNotBlank() || caption.isNotBlank())) append("\\n")
+                            if (title.isNotBlank() && (crawl.isNotBlank() || caption.isNotBlank())) append("\n")
                             if (crawl.isNotBlank()) append(selectedNewsTemplate.uppercase(Locale.ROOT)).append("  •  ").append(crawl)
                             if (caption.isNotBlank()) {
-                                if (isNotEmpty()) append("\\n")
+                                if (isNotEmpty()) append("\n")
                                 append(caption)
                             }
                         }
