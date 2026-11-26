@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Page { HOME, VIDEO, PHOTO, TEMPLATE, EDITORIAL, PRESENTER, SPORTS, LIVE }
+private enum class Page { HOME, PROJECTS, MEDIA, VIDEO, VIDEO_TIMELINE, VIDEO_AUDIO, VIDEO_SUBTITLE, VIDEO_EXPORT, PHOTO, PHOTO_DESIGN, PHOTO_EXPORT, TEMPLATE, EDITORIAL, NEWS_SOURCES, NEWS_DRAFTS, PRESENTER, PRESENTER_AVATAR, VOICE_LIBRARY, SPORTS, GRAPHICS, LIVE, LIVE_SETUP, SETTINGS, HELP }
 
 @Composable
 private fun InfoKiniApp() {
@@ -159,6 +159,7 @@ private fun InfoKiniApp() {
                     }
                     Page.SPORTS -> SportsPage(homeTeam, { homeTeam = it }, awayTeam, { awayTeam = it }, homeScore, { homeScore = it }, awayScore, { awayScore = it })
                     Page.LIVE -> LivePage(context)
+                    else -> StudioModulePage(page)
                 }
                 Text("InfoKini News Studio • Redaksi memegang kendali atas verifikasi dan publikasi.", color = Muted, fontSize = 10.sp)
             }
@@ -179,13 +180,28 @@ private fun HomePage(go: (Page) -> Unit) {
         }
         Text("MENU STUDIO", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         val items = listOf(
-            Triple("EDITOR VIDEO", "Klip, judul, ticker, audio dan ekspor", Page.VIDEO),
-            Triple("EDITOR FOTO", "Materi visual, poster dan thumbnail", Page.PHOTO),
-            Triple("GALERI TEMPLATE", "Identitas visual program berita", Page.TEMPLATE),
-            Triple("AI REDAKTUR", "Pencarian sumber dan draf berita", Page.EDITORIAL),
-            Triple("PRESENTER & NARATOR", "Karakter presenter dan suara TTS", Page.PRESENTER),
-            Triple("GRAFIS OLAHRAGA", "Papan skor pertandingan", Page.SPORTS),
-            Triple("SIARAN LANGSUNG", "Persiapan platform live", Page.LIVE)
+            Triple("PROYEK SAYA", "Buat, buka, dan lanjutkan proyek berita", Page.PROJECTS),
+            Triple("GALERI MEDIA", "Kelola video, foto, audio, dan hasil ekspor", Page.MEDIA),
+            Triple("EDITOR VIDEO", "Ruang kerja utama penyuntingan video", Page.VIDEO),
+            Triple("TIMELINE & KLIP", "Susun banyak klip, potong, urutkan, dan transisi", Page.VIDEO_TIMELINE),
+            Triple("AUDIO & MUSIK", "Musik latar, rekaman suara, dan mixing", Page.VIDEO_AUDIO),
+            Triple("TEKS & SUBTITLE", "Judul, lower third, ticker, dan subtitle", Page.VIDEO_SUBTITLE),
+            Triple("EKSPOR VIDEO", "Pengaturan kualitas dan hasil MP4", Page.VIDEO_EXPORT),
+            Triple("EDITOR FOTO", "Penyuntingan foto dan materi visual", Page.PHOTO),
+            Triple("DESAIN GRAFIS", "Poster, thumbnail, crop, dan teks foto", Page.PHOTO_DESIGN),
+            Triple("EKSPOR FOTO", "Simpan hasil desain ke perangkat", Page.PHOTO_EXPORT),
+            Triple("TEMPLATE STUDIO", "Paket grafis dan format acara berita", Page.TEMPLATE),
+            Triple("AI REDAKTUR", "Pantau topik dan kumpulkan berita", Page.EDITORIAL),
+            Triple("SUMBER BERITA", "Daftar sumber, tautan, dan verifikasi", Page.NEWS_SOURCES),
+            Triple("DRAF & VERIFIKASI", "Naskah AI, cek fakta, dan persetujuan", Page.NEWS_DRAFTS),
+            Triple("PRESENTER DIGITAL", "Presenter manusia orisinal dan avatar", Page.PRESENTER_AVATAR),
+            Triple("NARATOR & SUARA", "Pilihan suara TTS Bahasa Indonesia", Page.VOICE_LIBRARY),
+            Triple("GRAFIS OLAHRAGA", "Skor, papan pertandingan, dan lower third", Page.SPORTS),
+            Triple("PAKET GRAFIS", "Peta, cuaca, breaking news, dan infografik", Page.GRAPHICS),
+            Triple("SIARAN LANGSUNG", "Pusat persiapan live streaming", Page.LIVE),
+            Triple("KONEKSI LIVE", "YouTube, TikTok, Facebook, dan RTMP", Page.LIVE_SETUP),
+            Triple("PENGATURAN", "Identitas kanal, ekspor, dan penyimpanan", Page.SETTINGS),
+            Triple("PANDUAN & BANTUAN", "Petunjuk penggunaan dan status fitur", Page.HELP)
         )
         items.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -204,6 +220,47 @@ private fun HomePage(go: (Page) -> Unit) {
         Surface(color = Color(0xFF30291A), shape = RoundedCornerShape(12.dp)) {
             Text("Integrasi avatar manusia realistis, layanan AI redaksi, dan siaran langsung langsung membutuhkan API resmi serta konfigurasi akun.", Modifier.padding(13.dp), color = Gold, fontSize = 10.sp)
         }
+    }
+}
+
+@Composable
+private fun StudioModulePage(page: Page) {
+    val module = when (page) {
+        Page.PROJECTS -> Triple("PROYEK SAYA", "Kelola pekerjaan berita dari ide sampai video final.", listOf("Buat proyek baru per berita atau program", "Buka dan lanjutkan proyek terakhir", "Simpan otomatis naskah dan pengaturan", "Duplikasi proyek sebagai template"))
+        Page.MEDIA -> Triple("GALERI MEDIA", "Pusat aset yang dipakai di seluruh ruang produksi.", listOf("Impor video, foto, logo, dan audio", "Kelompokkan aset berdasarkan proyek", "Pratinjau dan pilih beberapa media", "Lihat file hasil ekspor"))
+        Page.VIDEO_TIMELINE -> Triple("TIMELINE & KLIP", "Rancangan ruang penyuntingan multi-klip.", listOf("Beberapa track video dan overlay", "Potong, trim, split, dan susun klip", "Transisi antar-klip", "Atur rasio 16:9, 9:16, dan 1:1", "Undo dan redo riwayat edit"))
+        Page.VIDEO_AUDIO -> Triple("AUDIO & MUSIK", "Pengaturan suara untuk paket berita.", listOf("Impor musik latar dan efek suara", "Rekam atau impor voice-over", "Atur volume, fade in, dan fade out", "Mixing suara narator dengan musik", "Kontrol mute dan level audio"))
+        Page.VIDEO_SUBTITLE -> Triple("TEKS & SUBTITLE", "Perangkat grafis teks bergaya siaran televisi.", listOf("Judul utama dan subjudul berita", "Running text / ticker infokini.news", "Lower third nama presenter dan narasumber", "Subtitle manual dan sinkronisasi waktu", "Font, warna, posisi, dan animasi teks"))
+        Page.VIDEO_EXPORT -> Triple("EKSPOR VIDEO", "Halaman keluaran akhir untuk video berita.", listOf("Ekspor MP4 dengan H.264", "Pilihan resolusi 720p dan 1080p", "Pilihan frame rate dan kualitas", "Pratinjau sebelum ekspor", "Simpan ke Galeri dan bagikan"))
+        Page.PHOTO_DESIGN -> Triple("DESAIN GRAFIS FOTO", "Ruang desain visual untuk kebutuhan redaksi.", listOf("Crop, rotate, dan flip", "Kecerahan, kontras, dan saturasi", "Teks judul, logo, dan watermark", "Template thumbnail dan poster", "Lapisan elemen grafis"))
+        Page.PHOTO_EXPORT -> Triple("EKSPOR FOTO", "Simpan materi visual hasil penyuntingan.", listOf("Ekspor JPG dan PNG", "Atur kualitas gambar", "Simpan ke Galeri", "Nama file dan folder InfoKini"))
+        Page.NEWS_SOURCES -> Triple("SUMBER BERITA", "Daftar sumber yang dapat ditelusuri dan diperiksa.", listOf("Pencarian RSS dan kanal berita", "Simpan tautan sumber asli", "Catat waktu publikasi dan penulis bila tersedia", "Bandingkan minimal dua sumber independen", "Tandai sumber yang belum diverifikasi"))
+        Page.NEWS_DRAFTS -> Triple("DRAF & VERIFIKASI", "AI membantu menyusun, redaksi tetap memegang keputusan.", listOf("Susun draf dari bahan dan sumber terpilih", "Pisahkan fakta, klaim, dan informasi belum pasti", "Tampilkan tautan sumber pada setiap draf", "Checklist verifikasi dan penyuntingan", "Persetujuan manual sebelum ekspor atau publikasi"))
+        Page.PRESENTER_AVATAR -> Triple("PRESENTER DIGITAL", "Konsep presenter Indonesia dengan wajah orisinal, bukan tiruan orang nyata.", listOf("Pilihan presenter pria dan wanita", "Gaya busana dan latar studio", "Masukkan naskah presenter", "Render gerak dan sinkronisasi bibir melalui layanan avatar", "Pratinjau sebelum digunakan"))
+        Page.VOICE_LIBRARY -> Triple("NARATOR & SUARA", "Pengaturan pembacaan naskah Bahasa Indonesia.", listOf("Pilih suara TTS yang tersedia di perangkat", "Atur kecepatan dan intonasi", "Pratinjau pembacaan naskah", "Simpan audio narasi ke proyek"))
+        Page.GRAPHICS -> Triple("PAKET GRAFIS", "Elemen visual pendukung siaran dan video berita.", listOf("Breaking news dan headline strap", "Papan skor olahraga", "Peta lokasi dan penanda", "Grafik data dan infografik", "Cuaca dan informasi layanan publik"))
+        Page.LIVE_SETUP -> Triple("KONEKSI SIARAN LANGSUNG", "Persiapan integrasi resmi platform streaming.", listOf("Hubungkan kanal YouTube melalui OAuth", "Siapkan tujuan live TikTok sesuai akses akun", "Siapkan Facebook Live", "Konfigurasi RTMP/stream key secara aman", "Uji koneksi, audio, dan video sebelum tayang"))
+        Page.SETTINGS -> Triple("PENGATURAN STUDIO", "Identitas kanal dan preferensi produksi.", listOf("Nama kanal dan logo InfoKini", "Watermark infokini.news", "Folder penyimpanan dan kualitas ekspor", "Bahasa aplikasi dan preferensi suara", "Privasi, izin media, dan pengelolaan data"))
+        Page.HELP -> Triple("PANDUAN & BANTUAN", "Petunjuk penggunaan serta keterangan kesiapan fitur.", listOf("Panduan membuat proyek berita", "Panduan editor foto dan video", "Panduan verifikasi AI Redaktur", "Daftar fitur yang memerlukan internet atau API", "Informasi versi dan diagnostik aplikasi"))
+        else -> Triple("RUANG STUDIO", "Halaman fitur InfoKini News Studio.", listOf("Fitur sedang disiapkan"))
+    }
+    PageHeading("INFO KINI • RUANG PRODUKSI", module.first, module.second)
+    CardBlock {
+        Text("DAFTAR FITUR", color = Accent, fontWeight = FontWeight.Black, fontSize = 12.sp)
+        module.third.forEachIndexed { index, item ->
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("\${index + 1}.", color = Accent, fontWeight = FontWeight.Bold)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(item, color = Color.White, fontSize = 12.sp)
+                    Text("Ruang fitur dirancang • implementasi dan pengujian bertahap", color = Gold, fontSize = 9.sp)
+                }
+            }
+            if (index != module.third.lastIndex) HorizontalDivider(color = Color(0xFF29486B))
+        }
+    }
+    CardBlock {
+        Text("CATATAN KESIAPAN", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        Text("Halaman dan alur menu ini sudah dimasukkan ke struktur aplikasi. Daftar di atas bukan klaim bahwa seluruh mesin fitur telah aktif. Fungsi seperti render avatar, AI generatif, ekspor MP4, dan siaran langsung memerlukan implementasi teknis serta, untuk layanan tertentu, API atau akun resmi.", color = Muted, fontSize = 11.sp)
     }
 }
 
