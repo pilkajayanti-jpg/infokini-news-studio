@@ -129,6 +129,13 @@ fun InfoKiniStudio() {
     var aiGenerating by remember { mutableStateOf(false) }
     var aiBackendStatus by remember { mutableStateOf("Backend AI belum dikonfigurasi.") }
     var aiVerificationNotes by remember { mutableStateOf("") }
+    var integrationTesting by remember { mutableStateOf(false) }
+    var integrationStatus by remember { mutableStateOf("Belum diuji. Masukkan alamat backend HTTPS lalu tekan Uji koneksi.") }
+    var presenterBackendUrl by remember { mutableStateOf(context.getSharedPreferences("infokini_integrations", 0).getString("presenter_url", "").orEmpty()) }
+    var presenterStatus by remember { mutableStateOf("Belum terhubung") }
+    var youtubeStatus by remember { mutableStateOf("Perlu otorisasi akun dan konfigurasi siaran") }
+    var tiktokStatus by remember { mutableStateOf("Perlu akses LIVE dan konfigurasi siaran") }
+    var facebookStatus by remember { mutableStateOf("Perlu otorisasi akun dan konfigurasi siaran") }
     var reporterTopic by remember { mutableStateOf("") }
     var rssNewsItems by remember { mutableStateOf<List<ReporterRssItem>>(emptyList()) }
     var rssLoading by remember { mutableStateOf(false) }
@@ -1447,6 +1454,44 @@ fun InfoKiniStudio() {
                 Text("Tampilkan label LIVE pada pratinjau", color = Color.White, modifier = Modifier.weight(1f))
                 Switch(checked = live, onCheckedChange = { live = it })
             }
+            Text("PUSAT INTEGRASI & PENYANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text("Kelola sambungan layanan dari satu tempat. Status hanya berubah menjadi aktif setelah koneksi atau otorisasi benar-benar berhasil.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Text("1. BACKEND AI / CLOUDFLARE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("Alamat backend yang sama digunakan untuk AI Reporter. Simpan URL HTTPS di kolom AI Reporter di atas.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            Text(integrationStatus, color = if (integrationStatus.startsWith("Terhubung")) Color(0xFF8BE0A0) else Color(0xFFFFD27A), fontSize = 11.sp)
+            Button(onClick = {
+                if (!isValidHttpsUrl(aiBackendUrl)) {
+                    integrationStatus = "Gagal: masukkan alamat backend HTTPS yang valid pada bagian AI Reporter."
+                } else screenScope.launch {
+                    integrationTesting = true
+                    integrationStatus = "Sedang menguji endpoint /health..."
+                    try {
+                        val result = testInfoKiniBackend(aiBackendUrl)
+                        integrationStatus = if (result) "Terhubung: backend merespons sehat. AI tetap perlu diuji dengan API key dan model yang benar." else "Gagal: backend belum siap atau belum mengonfirmasi status sehat."
+                    } catch (error: Exception) {
+                        integrationStatus = "Gagal terhubung: " + (error.message ?: "periksa URL dan server")
+                    } finally { integrationTesting = false }
+                }
+            }, enabled = !integrationTesting, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)) {
+                Text(if (integrationTesting) "MENGUJI KONEKSI..." else "UJI KONEKSI BACKEND")
+            }
+            androidx.compose.foundation.layout.HorizontalDivider(color = Color(0xFF34415F))
+            Text("2. PRESENTER VIRTUAL / AVATAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            StudioField("URL layanan presenter (HTTPS)", presenterBackendUrl, { presenterBackendUrl = it.trim(); context.getSharedPreferences("infokini_integrations", 0).edit().putString("presenter_url", it.trim()).apply() }, "https://server-avatar-anda.example")
+            Text("Status: $presenterStatus. URL dapat disimpan, tetapi avatar dan sinkronisasi bibir baru aktif setelah penyedia layanan serta format API terintegrasi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            OutlinedButton(onClick = {
+                presenterStatus = if (isValidHttpsUrl(presenterBackendUrl)) "URL tersimpan; belum diuji karena format API penyedia belum ditentukan" else "URL belum valid"
+                Toast.makeText(context, presenterStatus, Toast.LENGTH_LONG).show()
+            }, modifier = Modifier.fillMaxWidth()) { Text("PERIKSA URL PRESENTER") }
+            androidx.compose.foundation.layout.HorizontalDivider(color = Color(0xFF34415F))
+            Text("3. PLATFORM SIARAN LANGSUNG", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("YouTube: $youtubeStatus", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://studio.youtube.com/channel/"))) }, modifier = Modifier.fillMaxWidth()) { Text("SAMBUNGKAN / BUKA YOUTUBE STUDIO") }
+            Text("TikTok: $tiktokStatus", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com/live/creator-center"))) }, modifier = Modifier.fillMaxWidth()) { Text("BUKA TIKTOK LIVE CENTER") }
+            Text("Facebook: $facebookStatus", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/live/producer/"))) }, modifier = Modifier.fillMaxWidth()) { Text("BUKA FACEBOOK LIVE PRODUCER") }
+            Text("Catatan keamanan: jangan tempelkan stream key, kata sandi, atau token rahasia ke kolom URL. Koneksi siaran langsung langsung dari aplikasi belum aktif hanya dengan membuka halaman platform; masih memerlukan OAuth/API resmi dan pengujian.", color = Color(0xFFFFD27A), fontSize = 10.sp)
             Text("KONEKSI SIARAN LANGSUNG", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             Text("Tautan ini membuka panduan resmi. Tombol LIVE di aplikasi hanya label/pratinjau; siaran langsung langsung dari aplikasi belum aktif dan memerlukan integrasi API, akun, serta pengujian platform.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1626,4 +1671,21 @@ private fun StudioField(label: String, value: String, onValueChange: (String) ->
             }
         )
     }
+}
+
+
+private suspend fun testInfoKiniBackend(baseUrl: String): Boolean = withContext(Dispatchers.IO) {
+    val normalizedBase = baseUrl.trim().trimEnd('/')
+    val connection = (URL("$normalizedBase/health").openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 10000
+        readTimeout = 12000
+        setRequestProperty("Accept", "application/json")
+    }
+    try {
+        val status = connection.responseCode
+        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+        val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+        status in 200..299 && JSONObject(body).optString("status") == "ok"
+    } finally { connection.disconnect() }
 }
