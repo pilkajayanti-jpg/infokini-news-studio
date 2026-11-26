@@ -1756,10 +1756,25 @@ fun InfoKiniStudio() {
                 enabled = !narrationGenerating,
                 modifier = Modifier.fillMaxWidth()
             ) { Text(if (narrationGenerating) "MEMBUAT AUDIO NARATOR..." else "BUAT AUDIO NARATOR UNTUK MP4") }
+            val currentNarrationScript = listOf(headline.trim(), ticker.trim(), videoCaption.trim())
+                .filter { it.isNotBlank() }.joinToString(". ")
+            val narrationIsCurrent = narrationAudioFile?.let { it.exists() && it.length() > 44L } == true &&
+                narrationAudioScript == currentNarrationScript && currentNarrationScript.isNotBlank()
             Text(
-                if (narrationAudioFile?.exists() == true) "Audio narator siap untuk ekspor MP4." else "Buat audio narator terlebih dahulu agar suara masuk ke dalam video hasil ekspor.",
-                color = Color(0xFFB8C4D9), fontSize = 11.sp
+                if (narrationIsCurrent) "Audio narator siap dan sesuai dengan naskah saat ini." else "Audio narator belum siap atau naskah sudah berubah. Buat ulang sebelum ekspor agar suara tidak tertinggal.",
+                color = if (narrationIsCurrent) Color(0xFF8BE0A0) else Color(0xFFFFD27A), fontSize = 11.sp
             )
+            if (narrationAudioFile != null) {
+                OutlinedButton(
+                    onClick = {
+                        narrationAudioFile?.delete()
+                        narrationAudioFile = null
+                        narrationAudioScript = ""
+                        Toast.makeText(context, "Audio narator dihapus. Buat ulang bila diperlukan.", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("HAPUS / RESET AUDIO NARATOR") }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Tampilkan label LIVE pada pratinjau", color = Color.White, modifier = Modifier.weight(1f))
                 Switch(checked = live, onCheckedChange = { live = it })
