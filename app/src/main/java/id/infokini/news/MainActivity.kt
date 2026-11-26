@@ -859,7 +859,7 @@ fun InfoKiniStudio() {
                         .putString("${projectKey}_media_label", mediaLabel)
                         .putString("${projectKey}_extra_video_uris", additionalVideoUris.joinToString("|") { it.toString() })
                         .putString("${projectKey}_clip_trims", JSONObject().apply {
-                            clipTrimPercentages.forEach { (uri, range) -> putString(uri, "${range.first},${range.second}") }
+                            clipTrimPercentages.forEach { (uri, range) -> put(uri, "${range.first},${range.second}") }
                         }.toString())
                         .putString("${projectKey}_music_uri", backgroundMusicUri?.toString().orEmpty())
                         .putString("${projectKey}_music_label", backgroundMusicLabel)
