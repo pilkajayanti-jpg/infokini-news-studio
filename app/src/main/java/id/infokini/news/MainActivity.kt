@@ -91,6 +91,9 @@ fun InfoKiniStudio() {
     var homeRedCards by remember { mutableIntStateOf(0) }
     var awayRedCards by remember { mutableIntStateOf(0) }
     var matchEvents by remember { mutableStateOf("") }
+    var homeLogoUri by remember { mutableStateOf<Uri?>(null) }
+    var awayLogoUri by remember { mutableStateOf<Uri?>(null) }
+    var competitionLogoUri by remember { mutableStateOf<Uri?>(null) }
     var matchClockRunning by remember { mutableStateOf(false) }
     var matchElapsedSeconds by remember { mutableIntStateOf(0) }
     LaunchedEffect(matchClockRunning) {
@@ -120,6 +123,11 @@ fun InfoKiniStudio() {
             }
         }
     }
+
+
+    val homeLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { homeLogoUri = it }
+    val awayLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { awayLogoUri = it }
+    val competitionLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { competitionLogoUri = it }
 
     val videoExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { outputUri ->
         if (outputUri != null) {
@@ -305,12 +313,22 @@ fun InfoKiniStudio() {
                 if (footballMode) {
                     Column(Modifier.fillMaxWidth().background(Color(0xFF07152B), RoundedCornerShape(8.dp)).padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(competition.ifBlank { "NAMA KOMPETISI" }, color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            if (competitionLogoUri != null) {
+                                AndroidView(factory = { ImageView(it).apply { setImageURI(competitionLogoUri); scaleType = ImageView.ScaleType.FIT_CENTER } },
+                                    update = { it.setImageURI(competitionLogoUri) }, modifier = Modifier.size(28.dp))
+                            }
+                            Text(competition.ifBlank { "NAMA KOMPETISI" }, color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceEvenly) {
+                            if (homeLogoUri != null) AndroidView(factory = { ImageView(it).apply { setImageURI(homeLogoUri); scaleType = ImageView.ScaleType.FIT_CENTER } },
+                                update = { it.setImageURI(homeLogoUri) }, modifier = Modifier.size(34.dp))
                             Text(homeTeam.ifBlank { "TIM A" }, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                             Text("$homeScore - $awayScore", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
                             Text(awayTeam.ifBlank { "TIM B" }, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            if (awayLogoUri != null) AndroidView(factory = { ImageView(it).apply { setImageURI(awayLogoUri); scaleType = ImageView.ScaleType.FIT_CENTER } },
+                                update = { it.setImageURI(awayLogoUri) }, modifier = Modifier.size(34.dp))
                         }
                         Text("$matchTime  •  $matchStatus", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Text("KUNING $homeYellowCards | MERAH $homeRedCards     KUNING $awayYellowCards | MERAH $awayRedCards", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
@@ -366,6 +384,12 @@ fun InfoKiniStudio() {
                             DropdownMenuItem(text = { Text(status) }, onClick = { matchStatus = status; expandedStatus = false })
                         }
                     }
+                }
+                Text("LOGO PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick = { competitionLogoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) { Text("Logo kompetisi") }
+                    OutlinedButton(onClick = { homeLogoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) { Text("Logo tim A") }
+                    OutlinedButton(onClick = { awayLogoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) { Text("Logo tim B") }
                 }
                 Text("KARTU PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
