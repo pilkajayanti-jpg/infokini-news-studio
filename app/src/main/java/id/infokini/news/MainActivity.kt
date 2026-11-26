@@ -1467,7 +1467,7 @@ fun InfoKiniStudio() {
                     integrationStatus = "Sedang menguji endpoint /health..."
                     try {
                         val result = testInfoKiniBackend(aiBackendUrl)
-                        integrationStatus = if (result) "Terhubung: backend merespons sehat. AI tetap perlu diuji dengan API key dan model yang benar." else "Gagal: backend belum siap atau belum mengonfirmasi status sehat."
+                        integrationStatus = if (result) "Terhubung: endpoint backend merespons sehat. Kesiapan API AI (kunci dan model) diuji saat membuat draf." else "Gagal: backend belum siap atau belum mengonfirmasi status sehat."
                     } catch (error: Exception) {
                         integrationStatus = "Gagal terhubung: " + (error.message ?: "periksa URL dan server")
                     } finally { integrationTesting = false }
@@ -1686,6 +1686,6 @@ private suspend fun testInfoKiniBackend(baseUrl: String): Boolean = withContext(
         val status = connection.responseCode
         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
         val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-        status in 200..299 && JSONObject(body).optString("status") == "ok"
+        status in 200..299 && JSONObject(body).optBoolean("ok", false)
     } finally { connection.disconnect() }
 }
