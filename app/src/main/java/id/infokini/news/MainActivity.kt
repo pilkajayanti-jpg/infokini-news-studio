@@ -203,6 +203,61 @@ fun InfoKiniStudio() {
         }
     }
 
+    val matchGraphicExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { outputUri ->
+        if (outputUri != null) {
+            try {
+                val graphic = Bitmap.createBitmap(1080, 560, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(graphic)
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create("sans-serif", Typeface.BOLD) }
+                paint.color = android.graphics.Color.rgb(8, 13, 74)
+                canvas.drawRect(0f, 0f, 1080f, 560f, paint)
+                paint.color = android.graphics.Color.rgb(19, 189, 235)
+                canvas.drawRect(0f, 0f, 1080f, 12f, paint)
+                paint.textSize = 38f
+                canvas.drawText("INFO KINI  •  infokini.news", 48f, 78f, paint)
+                paint.color = android.graphics.Color.WHITE
+                paint.textSize = 30f
+                canvas.drawText(competition.ifBlank { "PERTANDINGAN" }.take(42), 48f, 142f, paint)
+                fun drawLogo(uri: Uri?, left: Float) {
+                    if (uri == null) return
+                    try {
+                        val logo = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+                        if (logo != null) {
+                            val dst = RectF(left, 180f, left + 132f, 312f)
+                            canvas.drawBitmap(logo, null, dst, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                            logo.recycle()
+                        }
+                    } catch (_: Exception) { }
+                }
+                drawLogo(homeLogoUri, 80f)
+                drawLogo(awayLogoUri, 868f)
+                paint.color = android.graphics.Color.WHITE
+                paint.textSize = 44f
+                canvas.drawText(homeTeam.ifBlank { "TIM A" }.take(18), 235f, 238f, paint)
+                canvas.drawText(awayTeam.ifBlank { "TIM B" }.take(18), 650f, 238f, paint)
+                paint.typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                paint.textSize = 100f
+                canvas.drawText(homeScore, 390f, 360f, paint)
+                canvas.drawText("-", 510f, 360f, paint)
+                canvas.drawText(awayScore, 590f, 360f, paint)
+                paint.color = android.graphics.Color.rgb(19, 189, 235)
+                paint.textSize = 34f
+                canvas.drawText("$matchTime  •  $matchStatus", 300f, 430f, paint)
+                paint.color = android.graphics.Color.WHITE
+                paint.textSize = 24f
+                canvas.drawText("KUNING $homeYellowCards  MERAH $homeRedCards", 55f, 500f, paint)
+                canvas.drawText("KUNING $awayYellowCards  MERAH $awayRedCards", 600f, 500f, paint)
+                context.contentResolver.openOutputStream(outputUri)?.use {
+                    if (!graphic.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IllegalStateException("PNG gagal disimpan")
+                } ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka")
+                graphic.recycle()
+                Toast.makeText(context, "Grafis pertandingan berhasil diekspor", Toast.LENGTH_LONG).show()
+            } catch (error: Exception) {
+                Toast.makeText(context, "Ekspor grafis gagal: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     val posterExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { outputUri ->
         if (outputUri != null) {
             val sourceUri = selectedMedia
@@ -430,6 +485,9 @@ fun InfoKiniStudio() {
                     OutlinedButton(onClick = { awayYellowCards = (awayYellowCards - 1).coerceAtLeast(0); awayRedCards = (awayRedCards - 1).coerceAtLeast(0) }, modifier = Modifier.weight(1f)) { Text("Koreksi tandang") }
                 }
                 StudioField("Catatan kejadian (gol / pergantian)", matchEvents, { matchEvents = it }, "Contoh: 32' Gol Tim A • 60' Pergantian pemain")
+                Button(onClick = { matchGraphicExporter.launch("infokini-skor-pertandingan.png") }, modifier = Modifier.fillMaxWidth()) {
+                    Text("EKSPOR GRAFIS PERTANDINGAN PNG")
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         val prefs = context.getSharedPreferences("infokini_match", 0)
