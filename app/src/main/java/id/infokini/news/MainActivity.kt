@@ -128,6 +128,8 @@ fun InfoKiniStudio() {
     var backgroundMusicUri by remember { mutableStateOf<Uri?>(null) }
     var backgroundMusicLabel by remember { mutableStateOf("Belum ada musik dipilih") }
     var backgroundMusicEnabled by remember { mutableStateOf(true) }
+    var selectedMusicTheme by remember { mutableStateOf("InfoKini News Theme") }
+    var musicThemeMenu by remember { mutableStateOf(false) }
     var photoBrightness by remember { mutableFloatStateOf(0f) }
     var photoContrast by remember { mutableFloatStateOf(1f) }
     var photoSaturation by remember { mutableFloatStateOf(1f) }
@@ -781,7 +783,11 @@ fun InfoKiniStudio() {
             StudioField("Lokasi berita", location, { location = it }, "Contoh: Cigombong, Kabupaten Bogor")
             }
             Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Keluaran akhir yang dituju adalah VIDEO BERITA, bukan artikel. Masukkan topik dan sumber, verifikasi fakta, lalu susun naskah narasi serta arahan visual untuk diproses di Editor Video. Pemantauan otomatis lintas platform dan pembuatan video AI penuh memerlukan API resmi serta layanan backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Text("Alur kerja redaksi: cari dan telusuri sumber, catat fakta, verifikasi silang, susun naskah video orisinal, lalu minta persetujuan redaksi. Saat ini aplikasi menyediakan alur input dan pemeriksaan manual; pemantauan otomatis lintas platform, rangkuman otomatis, dan pembuatan video AI penuh belum aktif karena membutuhkan API resmi serta backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            OutlinedButton(onClick = {
+                if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://news.google.com/search?q=" + Uri.encode(reporterTopic))))
+            }, modifier = Modifier.fillMaxWidth()) { Text("CARI SUMBER BERITA TERKINI (GOOGLE NEWS)") }
             StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false }, "Contoh: banjir, kebijakan publik, olahraga...")
             StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false }, "Tempel URL berita atau unggahan publik...")
             StudioField("Fakta dan hasil konfirmasi", reporterFacts, { reporterFacts = it; reporterApproved = false }, "Catat siapa, apa, kapan, di mana, bukti, dan tanggapan...")
@@ -827,10 +833,19 @@ fun InfoKiniStudio() {
             ) { Text("PILIH FOTO / VIDEO DARI HP") }
             Text(mediaLabel, color = Color.LightGray, fontSize = 12.sp)
 
-            Text("MUSIK LATAR BERITA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text("Pilih musik dari perangkat. Musik akan diulang mengikuti durasi video saat ekspor MP4.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Text("MUSIK EKSKLUSIF INFO KINI", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text("Pilih karakter musik InfoKini untuk kebutuhan produksi. Katalog audio orisinal masih disiapkan; pilihan tema di bawah adalah kategori produksi, bukan file musik yang sudah tersedia.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            OutlinedButton(onClick = { musicThemeMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Tema musik: $selectedMusicTheme")
+            }
+            DropdownMenu(expanded = musicThemeMenu, onDismissRequest = { musicThemeMenu = false }) {
+                listOf("InfoKini Breaking News", "InfoKini News Theme", "InfoKini Documentary", "InfoKini Sport", "InfoKini Closing").forEach { theme ->
+                    DropdownMenuItem(text = { Text(theme) }, onClick = { selectedMusicTheme = theme; musicThemeMenu = false })
+                }
+            }
+            Text("Pilih file audio yang sudah Anda miliki atau berlisensi untuk dipakai. Musik pilihan akan diulang mengikuti durasi video saat ekspor MP4.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             OutlinedButton(onClick = { musicPicker.launch(arrayOf("audio/*")) }, modifier = Modifier.fillMaxWidth()) {
-                Text("PILIH MUSIK LATAR (MP3 / AUDIO)")
+                Text("PILIH FILE MUSIK (MP3 / AUDIO)")
             }
             Text(backgroundMusicLabel, color = Color.LightGray, fontSize = 11.sp)
             if (backgroundMusicUri != null) {
@@ -1019,7 +1034,7 @@ fun InfoKiniStudio() {
                             }
                         }
                     }
-                    Text("Avatar realistis dan gerak bibir sinkron memerlukan integrasi layanan AI avatar; pilihan ini saat ini mengatur karakter dan gaya narasi.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+                    Text("Saat ini pembawa acara menggunakan Text-to-Speech Android dengan pilihan gaya suara. Wajah avatar fiktif, animasi presenter, dan sinkronisasi gerak bibir belum aktif; fitur tersebut memerlukan aset karakter orisinal dan integrasi layanan avatar.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
@@ -1073,9 +1088,16 @@ fun InfoKiniStudio() {
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Tampilkan label LIVE", color = Color.White, modifier = Modifier.weight(1f))
+                Text("Tampilkan label LIVE pada pratinjau", color = Color.White, modifier = Modifier.weight(1f))
                 Switch(checked = live, onCheckedChange = { live = it })
             }
+            Text("KONEKSI SIARAN LANGSUNG", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text("Tautan ini membuka panduan resmi. Tombol LIVE di aplikasi hanya label/pratinjau; siaran langsung langsung dari aplikasi belum aktif dan memerlukan integrasi API, akun, serta pengujian platform.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://support.google.com/youtube/answer/2474026"))) }, modifier = Modifier.weight(1f)) { Text("YouTube Live") }
+                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com/live/creator-center"))) }, modifier = Modifier.weight(1f)) { Text("TikTok LIVE") }
+            }
+            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/business/help/"))) }, modifier = Modifier.fillMaxWidth()) { Text("Panduan Facebook Live") }
             Button(
                 onClick = { /* preview updates live from editor fields */ },
                 modifier = Modifier.fillMaxWidth(),
