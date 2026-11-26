@@ -13,7 +13,7 @@ InfoKini Studio adalah studio produksi konten berita untuk membantu pengguna men
 - Pemilihan musik latar dari berkas perangkat dan pengulangan musik saat ekspor jika komposisi didukung oleh format media.
 - Editor foto dengan kontrol kecerahan, kontras, saturasi, rotasi, flip horizontal/vertikal, teks/caption, opsi watermark InfoKini, simpan/muat setelan, dan ekspor foto/poster.
 - Text-to-Speech Android untuk membacakan naskah berbahasa Indonesia, dengan pilihan suara yang tersedia di perangkat dan gaya penyampaian.
-- Modul Reporter/Redaktur berbasis alur kerja manual: pencarian topik melalui tautan publik, pencatatan sumber/fakta/naskah, penandaan verifikasi, penyimpanan draf, dan persetujuan redaksi sebelum materi Reporter disiapkan untuk video.
+- Modul Reporter/Redaktur berbasis alur kerja manual: pencarian topik melalui tautan publik, pencatatan dua URL sumber, fakta/naskah, penandaan verifikasi, penyimpanan draf, dan persetujuan redaksi sebelum materi Reporter disiapkan untuk video. Persetujuan memerlukan dua URL HTTP(S) berbeda, tetapi aplikasi belum memeriksa apakah penerbitnya benar-benar independen atau isi laporannya saling menguatkan.
 - Pintasan penelusuran topik ke Google News, Bing News, YouTube, TikTok, Facebook, X, Instagram melalui pencarian web, Reddit, dan Google Trends. Tautan tersebut membuka layanan eksternal; aplikasi tidak memantau atau mengambil data platform secara otomatis.
 - Grafis skor pertandingan dengan pengisian data manual dan ekspor grafis.
 - Kredit “Powered by Wandi Azis” pada antarmuka aplikasi.
