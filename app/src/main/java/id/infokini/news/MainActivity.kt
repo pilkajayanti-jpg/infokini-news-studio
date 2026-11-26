@@ -157,17 +157,27 @@ fun InfoKiniStudio() {
     var youtubeStatus by remember { mutableStateOf("Perlu otorisasi akun dan konfigurasi siaran") }
     var tiktokStatus by remember { mutableStateOf("Perlu akses LIVE dan konfigurasi siaran") }
     var facebookStatus by remember { mutableStateOf("Perlu otorisasi akun dan konfigurasi siaran") }
-    var reporterTopic by remember { mutableStateOf("") }
+    val reporterDraftPrefs = remember { context.getSharedPreferences("infokini_reporter_draft", 0) }
+    var reporterTopic by remember { mutableStateOf(reporterDraftPrefs.getString("topic", "").orEmpty()) }
     var rssNewsItems by remember { mutableStateOf<List<ReporterRssItem>>(emptyList()) }
     var rssLoading by remember { mutableStateOf(false) }
     var rssError by remember { mutableStateOf("") }
-    var reporterSourceUrl by remember { mutableStateOf("") }
-    var reporterComparisonSourceUrl by remember { mutableStateOf("") }
-    var reporterFacts by remember { mutableStateOf("") }
-    var reporterVideoScript by remember { mutableStateOf("") }
+    var reporterSourceUrl by remember { mutableStateOf(reporterDraftPrefs.getString("source_url", "").orEmpty()) }
+    var reporterComparisonSourceUrl by remember { mutableStateOf(reporterDraftPrefs.getString("comparison_url", "").orEmpty()) }
+    var reporterFacts by remember { mutableStateOf(reporterDraftPrefs.getString("facts", "").orEmpty()) }
+    var reporterVideoScript by remember { mutableStateOf(reporterDraftPrefs.getString("video_script", "").orEmpty()) }
     var reporterApproved by remember { mutableStateOf(false) }
     var reporterMaterialAppliedToVideo by remember { mutableStateOf(false) }
     var reporterVerified by remember { mutableStateOf(false) }
+    LaunchedEffect(reporterTopic, reporterSourceUrl, reporterComparisonSourceUrl, reporterFacts, reporterVideoScript) {
+        reporterDraftPrefs.edit()
+            .putString("topic", reporterTopic)
+            .putString("source_url", reporterSourceUrl)
+            .putString("comparison_url", reporterComparisonSourceUrl)
+            .putString("facts", reporterFacts)
+            .putString("video_script", reporterVideoScript)
+            .apply()
+    }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("") }
     var videoCaption by remember { mutableStateOf("") }
