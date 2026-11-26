@@ -76,6 +76,19 @@ private val Navy = Color(0xFF080D4A)
 private val Cyan = Color(0xFF13BDEB)
 private val Ink = Color(0xFF172033)
 
+private fun newsTemplatePalette(template: String): Pair<Int, Int> = when (template) {
+    "Breaking News" -> android.graphics.Color.rgb(115, 12, 24) to android.graphics.Color.rgb(255, 65, 65)
+    "Liputan Desa" -> android.graphics.Color.rgb(58, 78, 45) to android.graphics.Color.rgb(180, 210, 105)
+    "Wawancara" -> android.graphics.Color.rgb(55, 42, 92) to android.graphics.Color.rgb(185, 155, 255)
+    "Olahraga" -> android.graphics.Color.rgb(8, 70, 42) to android.graphics.Color.rgb(111, 220, 135)
+    "Info Cuaca" -> android.graphics.Color.rgb(10, 75, 105) to android.graphics.Color.rgb(85, 210, 235)
+    "Dokumenter" -> android.graphics.Color.rgb(48, 43, 35) to android.graphics.Color.rgb(225, 185, 115)
+    "Kriminal" -> android.graphics.Color.rgb(75, 18, 30) to android.graphics.Color.rgb(240, 70, 70)
+    "Ekonomi / UMKM" -> android.graphics.Color.rgb(75, 58, 18) to android.graphics.Color.rgb(240, 190, 65)
+    "Vertikal Sosial Media" -> android.graphics.Color.rgb(75, 30, 85) to android.graphics.Color.rgb(240, 95, 190)
+    else -> android.graphics.Color.rgb(8, 13, 74) to android.graphics.Color.rgb(19, 189, 235)
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -282,22 +295,7 @@ fun InfoKiniStudio() {
                         .setClippingConfiguration(clipping)
                         .build()
                     val videoOverlays = mutableListOf<TextureOverlay>()
-                    val templateBaseColor = when (selectedNewsTemplate) {
-                        "Breaking News" -> android.graphics.Color.rgb(115, 12, 24)
-                        "Olahraga" -> android.graphics.Color.rgb(8, 70, 42)
-                        "Feature / Dokumenter" -> android.graphics.Color.rgb(48, 43, 35)
-                        "Info Cuaca" -> android.graphics.Color.rgb(10, 75, 105)
-                        "Wawancara" -> android.graphics.Color.rgb(55, 42, 92)
-                        else -> android.graphics.Color.rgb(8, 13, 74)
-                    }
-                    val templateAccentColor = when (selectedNewsTemplate) {
-                        "Breaking News" -> android.graphics.Color.rgb(255, 65, 65)
-                        "Olahraga" -> android.graphics.Color.rgb(111, 220, 135)
-                        "Feature / Dokumenter" -> android.graphics.Color.rgb(225, 185, 115)
-                        "Info Cuaca" -> android.graphics.Color.rgb(85, 210, 235)
-                        "Wawancara" -> android.graphics.Color.rgb(185, 155, 255)
-                        else -> android.graphics.Color.rgb(19, 189, 235)
-                    }
+                    val (templateBaseColor, templateAccentColor) = newsTemplatePalette(selectedNewsTemplate)
                     val title = headline.trim()
                     val crawl = ticker.trim()
                     val caption = videoCaption.trim()
@@ -916,16 +914,7 @@ fun InfoKiniStudio() {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         templateRow.forEach { template ->
                             val chosen = selectedNewsTemplate == template
-                            val base = when (template) {
-                                "Breaking News", "Kriminal" -> Color(0xFF781D2B)
-                                "Olahraga" -> Color(0xFF145B3C)
-                                "Info Cuaca" -> Color(0xFF075B83)
-                                "Dokumenter", "Liputan Desa" -> Color(0xFF55452D)
-                                "Wawancara" -> Color(0xFF40346F)
-                                "Ekonomi / UMKM" -> Color(0xFF66501B)
-                                "Vertikal Sosial Media" -> Color(0xFF6A285F)
-                                else -> Navy
-                            }
+                            val base = Color(newsTemplatePalette(template).first)
                             Surface(
                                 modifier = Modifier.weight(1f),
                                 onClick = { selectedNewsTemplate = template },
