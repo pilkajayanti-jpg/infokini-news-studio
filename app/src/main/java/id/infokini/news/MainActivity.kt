@@ -23,6 +23,17 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
+import androidx.media3.transformer.Effects
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.StaticOverlaySettings
+import androidx.media3.effect.TextOverlay
+import androidx.media3.effect.TextureOverlay
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.BackgroundColorSpan
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -59,6 +70,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(UnstableApi::class)
 @Composable
 fun InfoKiniStudio() {
     val context = LocalContext.current
@@ -169,7 +181,35 @@ fun InfoKiniStudio() {
                         .setUri(sourceUri)
                         .setClippingConfiguration(clipping)
                         .build()
-                    val editedItem = EditedMediaItem.Builder(mediaItem).build()
+                    val videoOverlays = mutableListOf<TextureOverlay>()
+                    if (headline.isNotBlank()) {
+                        val titleText = SpannableString(headline.trim())
+                        titleText.setSpan(ForegroundColorSpan(android.graphics.Color.WHITE), 0, titleText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        titleText.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(8, 13, 74)), 0, titleText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        titleText.setSpan(StyleSpan(Typeface.BOLD), 0, titleText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        val titleSettings = StaticOverlaySettings.Builder()
+                            .setOverlayFrameAnchor(-1f, -1f)
+                            .setBackgroundFrameAnchor(-0.92f, -0.62f)
+                            .build()
+                        videoOverlays.add(TextOverlay.createStaticTextOverlay(titleText, titleSettings))
+                    }
+                    if (ticker.isNotBlank()) {
+                        val tickerText = SpannableString(" INFO KINI  •  ${ticker.trim()} ")
+                        tickerText.setSpan(ForegroundColorSpan(android.graphics.Color.rgb(8, 13, 74)), 0, tickerText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        tickerText.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(19, 189, 235)), 0, tickerText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        tickerText.setSpan(StyleSpan(Typeface.BOLD), 0, tickerText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        val tickerSettings = StaticOverlaySettings.Builder()
+                            .setOverlayFrameAnchor(-1f, -1f)
+                            .setBackgroundFrameAnchor(-0.92f, -0.88f)
+                            .build()
+                        videoOverlays.add(TextOverlay.createStaticTextOverlay(tickerText, tickerSettings))
+                    }
+                    val effects = if (videoOverlays.isNotEmpty()) {
+                        Effects(emptyList(), listOf(OverlayEffect(videoOverlays)))
+                    } else {
+                        Effects(emptyList(), emptyList())
+                    }
+                    val editedItem = EditedMediaItem.Builder(mediaItem).setEffects(effects).build()
                     val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
                     val transformer = Transformer.Builder(context)
                         .addListener(object : Transformer.Listener {
