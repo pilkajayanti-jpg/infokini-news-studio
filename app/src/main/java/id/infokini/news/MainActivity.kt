@@ -125,9 +125,24 @@ fun InfoKiniStudio() {
     }
 
 
-    val homeLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { homeLogoUri = it }
-    val awayLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { awayLogoUri = it }
-    val competitionLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { competitionLogoUri = it }
+    fun keepLogoPermission(uri: Uri?) {
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {
+                // Some document providers do not offer persistable permissions.
+            }
+        }
+    }
+    val homeLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
+        keepLogoPermission(it); homeLogoUri = it
+    }
+    val awayLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
+        keepLogoPermission(it); awayLogoUri = it
+    }
+    val competitionLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
+        keepLogoPermission(it); competitionLogoUri = it
+    }
 
     val videoExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { outputUri ->
         if (outputUri != null) {
@@ -420,6 +435,9 @@ fun InfoKiniStudio() {
                         val prefs = context.getSharedPreferences("infokini_match", 0)
                         prefs.edit()
                             .putString("competition", competition)
+                            .putString("homeLogoUri", homeLogoUri?.toString())
+                            .putString("awayLogoUri", awayLogoUri?.toString())
+                            .putString("competitionLogoUri", competitionLogoUri?.toString())
                             .putString("homeTeam", homeTeam).putString("awayTeam", awayTeam)
                             .putString("homeScore", homeScore).putString("awayScore", awayScore)
                             .putString("matchTime", matchTime).putString("matchStatus", matchStatus)
@@ -432,6 +450,9 @@ fun InfoKiniStudio() {
                     OutlinedButton(onClick = {
                         val prefs = context.getSharedPreferences("infokini_match", 0)
                         competition = prefs.getString("competition", "").orEmpty()
+                        homeLogoUri = prefs.getString("homeLogoUri", null)?.let { Uri.parse(it) }
+                        awayLogoUri = prefs.getString("awayLogoUri", null)?.let { Uri.parse(it) }
+                        competitionLogoUri = prefs.getString("competitionLogoUri", null)?.let { Uri.parse(it) }
                         homeTeam = prefs.getString("homeTeam", "").orEmpty()
                         awayTeam = prefs.getString("awayTeam", "").orEmpty()
                         homeScore = prefs.getString("homeScore", "0") ?: "0"
