@@ -822,6 +822,38 @@ fun InfoKiniStudio() {
                     modifier = Modifier.weight(1f)
                 ) { Text("TikTok") }
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://x.com/search?q=$encodedReporterQuery")))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("X / Twitter") }
+                OutlinedButton(
+                    onClick = {
+                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode("site:instagram.com $reporterTopic"))))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Instagram") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.reddit.com/search/?q=$encodedReporterQuery")))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Reddit") }
+                OutlinedButton(
+                    onClick = {
+                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://trends.google.com/trends/explore?q=$encodedReporterQuery&geo=ID")))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Google Trends") }
+            }
             OutlinedButton(
                 onClick = {
                     if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
