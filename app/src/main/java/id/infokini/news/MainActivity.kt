@@ -71,6 +71,10 @@ private fun InfoKiniApp() {
     var template by remember { mutableStateOf(prefs.getString("template", "InfoKini Utama").orEmpty()) }
     var video by remember { mutableStateOf(prefs.getString("video", null)?.let(Uri::parse)) }
     var photo by remember { mutableStateOf(prefs.getString("photo", null)?.let(Uri::parse)) }
+    var photoBrightness by remember { mutableFloatStateOf(prefs.getFloat("photo_brightness", 0f)) }
+    var photoContrast by remember { mutableFloatStateOf(prefs.getFloat("photo_contrast", 1f)) }
+    var photoSaturation by remember { mutableFloatStateOf(prefs.getFloat("photo_saturation", 1f)) }
+    var photoRotation by remember { mutableFloatStateOf(prefs.getFloat("photo_rotation", 0f)) }
     var music by remember { mutableStateOf<Uri?>(null) }
     var results by remember { mutableStateOf<List<String>>(emptyList()) }
     var searchStatus by remember { mutableStateOf("Cari judul berita dari Google News RSS. Baca sumber asli sebelum digunakan.") }
@@ -88,7 +92,9 @@ private fun InfoKiniApp() {
         prefs.edit().putString("headline", headline).putString("ticker", ticker)
             .putString("script", script).putString("topic", topic).putString("source_a", sourceA)
             .putString("source_b", sourceB).putString("template", template)
-            .putString("video", video?.toString()).putString("photo", photo?.toString()).apply()
+            .putString("video", video?.toString()).putString("photo", photo?.toString())
+            .putFloat("photo_brightness", photoBrightness).putFloat("photo_contrast", photoContrast)
+            .putFloat("photo_saturation", photoSaturation).putFloat("photo_rotation", photoRotation).apply()
     }
     val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { runCatching { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }; video = it }
@@ -122,7 +128,7 @@ private fun InfoKiniApp() {
                 when (page) {
                     Page.HOME -> HomePage { page = it }
                     Page.VIDEO -> VideoPage(headline, { headline = it }, ticker, { ticker = it }, script, { script = it }, video, { pickVideo.launch(arrayOf("video/*")) }, music, { pickMusic.launch(arrayOf("audio/*")) }, template, { page = Page.TEMPLATE })
-                    Page.PHOTO -> PhotoPage(photo) { pickPhoto.launch(arrayOf("image/*")) }
+                    Page.PHOTO -> PhotoPage(photo, photoBrightness, { photoBrightness = it }, photoContrast, { photoContrast = it }, photoSaturation, { photoSaturation = it }, photoRotation, { photoRotation = it }) { pickPhoto.launch(arrayOf("image/*")) }
                     Page.TEMPLATE -> TemplatePage(template) { template = it; page = Page.VIDEO }
                     Page.EDITORIAL -> EditorialPage(topic, { topic = it }, sourceA, { sourceA = it }, sourceB, { sourceB = it }, script, { script = it }, results, searchStatus, {
                         scope.launch {
@@ -286,23 +292,57 @@ private fun VideoPage(headline: String, onHeadline: (String) -> Unit, ticker: St
 }
 
 @Composable
-private fun PhotoPage(photo: Uri?, pick: () -> Unit) {
+private fun PhotoPage(
+    photo: Uri?,
+    brightness: Float, onBrightness: (Float) -> Unit,
+    contrast: Float, onContrast: (Float) -> Unit,
+    saturation: Float, onSaturation: (Float) -> Unit,
+    rotation: Float, onRotation: (Float) -> Unit,
+    pick: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PageHeading("RUANG PRODUKSI / 02", "Editor Foto", "Pilih materi visual untuk poster dan thumbnail berita.")
+        PageHeading("RUANG PRODUKSI / 02", "Editor Foto", "Atur tampilan dasar foto untuk materi berita.")
         CardBlock {
             if (photo == null) {
                 Text("Belum ada foto dipilih.", color = Muted, fontSize = 12.sp)
             } else {
-                Text("PRATINJAU MATERI FOTO", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                AndroidView(factory = { ctx -> android.widget.ImageView(ctx).apply {
-                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                    setBackgroundColor(android.graphics.Color.BLACK)
-                    setImageURI(photo)
-                } }, modifier = Modifier.fillMaxWidth().height(230.dp))
-                Text(photo.lastPathSegment ?: "Foto terpilih", color = Muted, fontSize = 10.sp)
+                Text("PRATINJAU HASIL PENYESUAIAN", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                AndroidView(
+                    factory = { ctx -> android.widget.ImageView(ctx).apply {
+                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                    } },
+                    update = { image ->
+                        image.setImageURI(photo)
+                        val matrix = android.graphics.ColorMatrix().apply { setSaturation(saturation.coerceIn(0f, 2f)) }
+                        val cValue = contrast.coerceIn(0f, 2f)
+                        val bValue = brightness.coerceIn(-1f, 1f) * 255f
+                        val contrastMatrix = android.graphics.ColorMatrix(floatArrayOf(
+                            cValue, 0f, 0f, 0f, 128f * (1f - cValue) + bValue,
+                            0f, cValue, 0f, 0f, 128f * (1f - cValue) + bValue,
+                            0f, 0f, cValue, 0f, 128f * (1f - cValue) + bValue,
+                            0f, 0f, 0f, 1f, 0f
+                        ))
+                        matrix.postConcat(contrastMatrix)
+                        image.colorFilter = android.graphics.ColorMatrixColorFilter(matrix)
+                        image.rotation = rotation
+                    },
+                    modifier = Modifier.fillMaxWidth().height(245.dp).background(Color.Black)
+                )
+                Text("Kecerahan", color = Muted, fontSize = 11.sp)
+                Slider(value = brightness, onValueChange = onBrightness, valueRange = -1f..1f)
+                Text("Kontras", color = Muted, fontSize = 11.sp)
+                Slider(value = contrast, onValueChange = onContrast, valueRange = 0f..2f)
+                Text("Saturasi", color = Muted, fontSize = 11.sp)
+                Slider(value = saturation, onValueChange = onSaturation, valueRange = 0f..2f)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { onRotation((rotation - 90f + 360f) % 360f) }, modifier = Modifier.weight(1f)) { Text("PUTAR KIRI") }
+                    OutlinedButton(onClick = { onRotation((rotation + 90f) % 360f) }, modifier = Modifier.weight(1f)) { Text("PUTAR KANAN") }
+                }
+                ActionButton("RESET PENYESUAIAN", { onBrightness(0f); onContrast(1f); onSaturation(1f); onRotation(0f) })
             }
             ActionButton("＋ PILIH FOTO", pick, true)
-            Text("Panel penyuntingan foto dan ekspor poster akan dibangun pada tahap editor berikutnya.", color = Gold, fontSize = 11.sp)
+            Text("Penyesuaian tampil di pratinjau dan tersimpan pada proyek. Ekspor poster final belum diaktifkan.", color = Gold, fontSize = 11.sp)
         }
     }
 }
