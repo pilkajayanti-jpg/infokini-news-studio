@@ -177,10 +177,11 @@ fun InfoKiniStudio() {
     var additionalVideoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var clipTrimPercentages by remember { mutableStateOf<Map<String, Pair<Float, Float>>>(emptyMap()) }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
-    var backgroundMusicUri by remember { mutableStateOf<Uri?>(null) }
-    var backgroundMusicLabel by remember { mutableStateOf("Belum ada musik dipilih") }
-    var backgroundMusicEnabled by remember { mutableStateOf(true) }
-    var selectedMusicTheme by remember { mutableStateOf("InfoKini News Theme") }
+    val audioPreferences = remember { context.getSharedPreferences("infokini_audio", 0) }
+    var backgroundMusicUri by remember { mutableStateOf(audioPreferences.getString("music_uri", null)?.let { Uri.parse(it) }) }
+    var backgroundMusicLabel by remember { mutableStateOf(audioPreferences.getString("music_label", null) ?: "Belum ada musik dipilih") }
+    var backgroundMusicEnabled by remember { mutableStateOf(audioPreferences.getBoolean("music_enabled", true)) }
+    var selectedMusicTheme by remember { mutableStateOf(audioPreferences.getString("music_theme", "InfoKini News Theme") ?: "InfoKini News Theme") }
     var musicThemeMenu by remember { mutableStateOf(false) }
     var photoBrightness by remember { mutableFloatStateOf(0f) }
     var photoContrast by remember { mutableFloatStateOf(1f) }
@@ -275,6 +276,7 @@ fun InfoKiniStudio() {
             backgroundMusicUri = uri
             backgroundMusicLabel = uri.lastPathSegment ?: "Musik latar dipilih"
             backgroundMusicEnabled = true
+            audioPreferences.edit().putString("music_uri", uri.toString()).putString("music_label", backgroundMusicLabel).putBoolean("music_enabled", true).apply()
         }
     }
     val homeLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
@@ -1329,7 +1331,7 @@ fun InfoKiniStudio() {
             }
             DropdownMenu(expanded = musicThemeMenu, onDismissRequest = { musicThemeMenu = false }) {
                 listOf("InfoKini Breaking News", "InfoKini News Theme", "InfoKini Documentary", "InfoKini Sport", "InfoKini Closing").forEach { theme ->
-                    DropdownMenuItem(text = { Text(theme) }, onClick = { selectedMusicTheme = theme; musicThemeMenu = false })
+                    DropdownMenuItem(text = { Text(theme) }, onClick = { selectedMusicTheme = theme; audioPreferences.edit().putString("music_theme", theme).apply(); musicThemeMenu = false })
                 }
             }
             Text("Pilih file audio yang sudah Anda miliki atau berlisensi untuk dipakai. Musik pilihan akan diulang mengikuti durasi video saat ekspor MP4.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
@@ -1339,10 +1341,10 @@ fun InfoKiniStudio() {
             Text(backgroundMusicLabel, color = Color.LightGray, fontSize = 11.sp)
             if (backgroundMusicUri != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = backgroundMusicEnabled, onCheckedChange = { backgroundMusicEnabled = it })
+                    Checkbox(checked = backgroundMusicEnabled, onCheckedChange = { backgroundMusicEnabled = it; audioPreferences.edit().putBoolean("music_enabled", it).apply() })
                     Text("Sertakan musik saat ekspor MP4", color = Color.White, fontSize = 12.sp)
                 }
-                OutlinedButton(onClick = { backgroundMusicUri = null; backgroundMusicLabel = "Belum ada musik dipilih" }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { backgroundMusicUri = null; backgroundMusicLabel = "Belum ada musik dipilih"; audioPreferences.edit().remove("music_uri").remove("music_label").apply() }, modifier = Modifier.fillMaxWidth()) {
                     Text("HAPUS PILIHAN MUSIK")
                 }
             }
