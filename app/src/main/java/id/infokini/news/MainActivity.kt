@@ -215,6 +215,15 @@ fun InfoKiniStudio() {
                 canvas.drawRect(0f, 0f, 1080f, 12f, paint)
                 paint.textSize = 38f
                 canvas.drawText("INFO KINI  •  infokini.news", 48f, 78f, paint)
+                if (competitionLogoUri != null) {
+                    try {
+                        val competitionLogo = context.contentResolver.openInputStream(competitionLogoUri!!)?.use { BitmapFactory.decodeStream(it) }
+                        if (competitionLogo != null) {
+                            canvas.drawBitmap(competitionLogo, null, RectF(930f, 28f, 1030f, 128f), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                            competitionLogo.recycle()
+                        }
+                    } catch (_: Exception) { }
+                }
                 paint.color = android.graphics.Color.WHITE
                 paint.textSize = 30f
                 canvas.drawText(competition.ifBlank { "PERTANDINGAN" }.take(42), 48f, 142f, paint)
