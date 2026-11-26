@@ -1423,9 +1423,44 @@ fun InfoKiniStudio() {
                         }
                         if (additionalVideoUris.isNotEmpty()) {
                             Text(
-                                "Urutan klip: video utama + " + additionalVideoUris.size + " klip tambahan. Klip tambahan akan disambung berurutan saat ekspor.",
+                                "URUTAN TIMELINE • Video utama berada di posisi pertama. Atur klip tambahan sebelum ekspor.",
                                 color = Color(0xFFB8C4D9), fontSize = 11.sp
                             )
+                            additionalVideoUris.forEachIndexed { index, clipUri ->
+                                Row(
+                                    Modifier.fillMaxWidth().background(Color(0xFF17233F), RoundedCornerShape(8.dp)).padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        "${index + 2}. " + (clipUri.lastPathSegment?.substringAfterLast('/') ?: "Klip video"),
+                                        color = Color.White, fontSize = 10.sp, modifier = Modifier.weight(1f), maxLines = 2
+                                    )
+                                    TextButton(
+                                        enabled = index > 0,
+                                        onClick = {
+                                            val reordered = additionalVideoUris.toMutableList()
+                                            val previous = reordered[index - 1]
+                                            reordered[index - 1] = reordered[index]
+                                            reordered[index] = previous
+                                            additionalVideoUris = reordered
+                                        }
+                                    ) { Text("↑") }
+                                    TextButton(
+                                        enabled = index < additionalVideoUris.lastIndex,
+                                        onClick = {
+                                            val reordered = additionalVideoUris.toMutableList()
+                                            val next = reordered[index + 1]
+                                            reordered[index + 1] = reordered[index]
+                                            reordered[index] = next
+                                            additionalVideoUris = reordered
+                                        }
+                                    ) { Text("↓") }
+                                    TextButton(onClick = {
+                                        additionalVideoUris = additionalVideoUris.filterIndexed { itemIndex, _ -> itemIndex != index }
+                                    }) { Text("Hapus", color = Color(0xFFFF8A8A)) }
+                                }
+                            }
                             OutlinedButton(onClick = { additionalVideoUris = emptyList() }, modifier = Modifier.fillMaxWidth()) {
                                 Text("KOSONGKAN KLIP TAMBAHAN")
                             }
