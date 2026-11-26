@@ -415,6 +415,39 @@ fun InfoKiniStudio() {
                     OutlinedButton(onClick = { awayYellowCards = (awayYellowCards - 1).coerceAtLeast(0); awayRedCards = (awayRedCards - 1).coerceAtLeast(0) }, modifier = Modifier.weight(1f)) { Text("Koreksi tandang") }
                 }
                 StudioField("Catatan kejadian (gol / pergantian)", matchEvents, { matchEvents = it }, "Contoh: 32' Gol Tim A • 60' Pergantian pemain")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        val prefs = context.getSharedPreferences("infokini_match", 0)
+                        prefs.edit()
+                            .putString("competition", competition)
+                            .putString("homeTeam", homeTeam).putString("awayTeam", awayTeam)
+                            .putString("homeScore", homeScore).putString("awayScore", awayScore)
+                            .putString("matchTime", matchTime).putString("matchStatus", matchStatus)
+                            .putInt("elapsed", matchElapsedSeconds)
+                            .putInt("homeYellow", homeYellowCards).putInt("awayYellow", awayYellowCards)
+                            .putInt("homeRed", homeRedCards).putInt("awayRed", awayRedCards)
+                            .putString("events", matchEvents).apply()
+                        Toast.makeText(context, "Data pertandingan tersimpan", Toast.LENGTH_SHORT).show()
+                    }, modifier = Modifier.weight(1f)) { Text("Simpan laga") }
+                    OutlinedButton(onClick = {
+                        val prefs = context.getSharedPreferences("infokini_match", 0)
+                        competition = prefs.getString("competition", "").orEmpty()
+                        homeTeam = prefs.getString("homeTeam", "").orEmpty()
+                        awayTeam = prefs.getString("awayTeam", "").orEmpty()
+                        homeScore = prefs.getString("homeScore", "0") ?: "0"
+                        awayScore = prefs.getString("awayScore", "0") ?: "0"
+                        matchTime = prefs.getString("matchTime", "00:00") ?: "00:00"
+                        matchStatus = prefs.getString("matchStatus", "BELUM DIMULAI") ?: "BELUM DIMULAI"
+                        matchElapsedSeconds = prefs.getInt("elapsed", 0)
+                        homeYellowCards = prefs.getInt("homeYellow", 0)
+                        awayYellowCards = prefs.getInt("awayYellow", 0)
+                        homeRedCards = prefs.getInt("homeRed", 0)
+                        awayRedCards = prefs.getInt("awayRed", 0)
+                        matchEvents = prefs.getString("events", "").orEmpty()
+                        matchClockRunning = false
+                        Toast.makeText(context, "Data pertandingan dimuat", Toast.LENGTH_SHORT).show()
+                    }, modifier = Modifier.weight(1f)) { Text("Muat laga") }
+                }
                 Text("Logo tim dan logo kompetisi serta timer otomatis masih memerlukan pengembangan lanjutan.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             } else if (sportsNewsMode) {
                 SportsNewsEditor()
