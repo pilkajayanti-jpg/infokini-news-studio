@@ -19,6 +19,8 @@ import android.widget.VideoView
 import android.media.MediaMetadataRetriever
 import java.io.File
 import androidx.media3.common.MediaItem
+import androidx.media3.common.audio.GainProcessor
+import androidx.media3.common.audio.DefaultGainProvider
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Composition
@@ -182,6 +184,8 @@ fun InfoKiniStudio() {
     var backgroundMusicLabel by remember { mutableStateOf(audioPreferences.getString("music_label", null) ?: "Belum ada musik dipilih") }
     var backgroundMusicEnabled by remember { mutableStateOf(audioPreferences.getBoolean("music_enabled", true)) }
     var selectedMusicTheme by remember { mutableStateOf(audioPreferences.getString("music_theme", "InfoKini News Theme") ?: "InfoKini News Theme") }
+    var musicVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("music_volume", 0.25f)) }
+    var originalAudioVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("original_audio_volume", 1f)) }
     var musicThemeMenu by remember { mutableStateOf(false) }
     var photoBrightness by remember { mutableFloatStateOf(0f) }
     var photoContrast by remember { mutableFloatStateOf(1f) }
@@ -356,7 +360,8 @@ fun InfoKiniStudio() {
                     if (videoOverlays.isNotEmpty()) {
                         videoEffects.add(OverlayEffect(videoOverlays))
                     }
-                    val effects = Effects(emptyList(), videoEffects)
+                    val videoAudioProcessor = GainProcessor(DefaultGainProvider.Builder(originalAudioVolume.coerceIn(0f, 1f)).build())
+                    val effects = Effects(listOf(videoAudioProcessor), videoEffects)
                     val editedItems = mutableListOf<EditedMediaItem>()
                     editedItems.add(EditedMediaItem.Builder(mediaItem).setEffects(effects).build())
                     additionalVideoUris.filter { it != sourceUri }.forEach { clipUri ->
@@ -383,7 +388,9 @@ fun InfoKiniStudio() {
                     }
                     val composition = if (backgroundMusicEnabled && backgroundMusicUri != null) {
                         val videoSequence = EditedMediaItemSequence.withAudioAndVideoFrom(editedItems)
-                        val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(backgroundMusicUri!!)).build()
+                        val musicAudioProcessor = GainProcessor(DefaultGainProvider.Builder(musicVolume.coerceIn(0f, 1f)).build())
+                        val musicEffects = Effects(listOf(musicAudioProcessor), emptyList())
+                        val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(backgroundMusicUri!!)).setEffects(musicEffects).build()
                         val musicSequence = EditedMediaItemSequence.withAudioFrom(listOf(musicItem))
                             .buildUpon().setIsLooping(true).build()
                         Composition.Builder(videoSequence, musicSequence).build()
@@ -1339,7 +1346,11 @@ fun InfoKiniStudio() {
                 Text("PILIH FILE MUSIK (MP3 / AUDIO)")
             }
             Text(backgroundMusicLabel, color = Color.LightGray, fontSize = 11.sp)
+            Text("Volume audio asli video: ${(originalAudioVolume * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
+            Slider(value = originalAudioVolume, onValueChange = { originalAudioVolume = it }, valueRange = 0f..1f, onValueChangeFinished = { audioPreferences.edit().putFloat("original_audio_volume", originalAudioVolume).apply() })
             if (backgroundMusicUri != null) {
+                Text("Volume musik latar: ${(musicVolume * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
+                Slider(value = musicVolume, onValueChange = { musicVolume = it }, valueRange = 0f..1f, onValueChangeFinished = { audioPreferences.edit().putFloat("music_volume", musicVolume).apply() })
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = backgroundMusicEnabled, onCheckedChange = { backgroundMusicEnabled = it; audioPreferences.edit().putBoolean("music_enabled", it).apply() })
                     Text("Sertakan musik saat ekspor MP4", color = Color.White, fontSize = 12.sp)
