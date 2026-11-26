@@ -1421,7 +1421,8 @@ fun InfoKiniStudio() {
                             }
                         }
                     }
-                    Text("Saat ini pembawa acara menggunakan Text-to-Speech Android dengan pilihan gaya suara. Wajah avatar fiktif, animasi presenter, dan sinkronisasi gerak bibir belum aktif; fitur tersebut memerlukan aset karakter orisinal dan integrasi layanan avatar.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+                    InfoKiniPresenterPortrait(presenterStyle)
+                    Text("Pratinjau karakter ilustratif orisinal InfoKini. Bukan tiruan wajah orang tertentu. Ini belum berupa video manusia fotorealistis atau animasi bibir; keduanya memerlukan layanan avatar khusus.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
