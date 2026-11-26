@@ -1103,7 +1103,7 @@ fun InfoKiniStudio() {
                             reporterVideoScript = generated.optString("script", reporterVideoScript)
                             aiBackendStatus = "Draf AI dibuat. Periksa fakta dan sumber; AI tidak menggantikan verifikasi redaksi."
                         } catch (error: Exception) {
-                            aiBackendStatus = "Gagal: \${error.message ?: "backend tidak dapat dihubungi"}"
+                            aiBackendStatus = "Gagal: ${error.message ?: "backend tidak dapat dihubungi"}"
                         } finally { aiGenerating = false }
                     }
                 }
@@ -1480,7 +1480,7 @@ private suspend fun generateNewsScriptWithBackend(
     sourceTwo: String
 ): JSONObject = withContext(Dispatchers.IO) {
     val normalizedBase = baseUrl.trim().trimEnd('/')
-    val connection = (URL("\${normalizedBase}/api/news-script").openConnection() as HttpURLConnection).apply {
+    val connection = (URL("${normalizedBase}/api/news-script").openConnection() as HttpURLConnection).apply {
         requestMethod = "POST"
         connectTimeout = 15000
         readTimeout = 60000
