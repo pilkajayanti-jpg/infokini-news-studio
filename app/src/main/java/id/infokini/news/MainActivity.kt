@@ -267,7 +267,7 @@ fun InfoKiniStudio() {
                             overlayText.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                         }
                         if (crawl.isNotBlank()) {
-                            val crawlStart = combined.indexOf("INFO KINI")
+                            val crawlStart = combined.indexOf(selectedNewsTemplate.uppercase(Locale.ROOT))
                             overlayText.setSpan(ForegroundColorSpan(templateBaseColor), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                             overlayText.setSpan(BackgroundColorSpan(templateAccentColor), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                             overlayText.setSpan(StyleSpan(Typeface.BOLD), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
