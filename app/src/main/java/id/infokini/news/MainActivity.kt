@@ -56,6 +56,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import kotlinx.coroutines.launch
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.Locale
 import java.net.URI
@@ -77,6 +80,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun InfoKiniStudio() {
     val context = LocalContext.current
+    val screenScrollState = rememberScrollState()
+    val screenScope = rememberCoroutineScope()
+    var reporterSectionY by remember { mutableIntStateOf(0) }
+    var photoSectionY by remember { mutableIntStateOf(0) }
     var ttsReady by remember { mutableStateOf(false) }
     var ttsVoiceNames by remember { mutableStateOf(listOf("Default Android")) }
     var selectedTtsVoice by remember { mutableStateOf("Default Android") }
@@ -550,7 +557,7 @@ fun InfoKiniStudio() {
         surface = Color(0xFF111A35), onSurface = Color.White
     )) {
         Column(
-            Modifier.fillMaxSize().background(Navy).verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.fillMaxSize().background(Navy).verticalScroll(screenScrollState).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -567,6 +574,16 @@ fun InfoKiniStudio() {
                 FilterChip(selected = !footballMode && !sportsNewsMode, onClick = { footballMode = false; sportsNewsMode = false }, label = { Text("Studio Berita") })
                 FilterChip(selected = footballMode, onClick = { footballMode = true; sportsNewsMode = false }, label = { Text("Skor Bola") })
                 FilterChip(selected = sportsNewsMode, onClick = { sportsNewsMode = true; footballMode = false }, label = { Text("Berita Olahraga") })
+            }
+            Text("MENU FITUR • VERSI 2.2", color = Color(0xFFB8C4D9), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("VIDEO", fontSize = 10.sp) }
+                OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(reporterSectionY.coerceAtLeast(0)) } }, modifier = Modifier.weight(1f)) { Text("AI REPORTER", fontSize = 10.sp) }
+                OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(photoSectionY.coerceAtLeast(0)) } }, modifier = Modifier.weight(1f)) { Text("FOTO", fontSize = 10.sp) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { sportsNewsMode = true; footballMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("BERITA OLAHRAGA", fontSize = 10.sp) }
+                OutlinedButton(onClick = { footballMode = true; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("GRAFIS SKOR", fontSize = 10.sp) }
             }
             Text("PRATINJAU SIARAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             Column(
@@ -918,7 +935,7 @@ fun InfoKiniStudio() {
             StudioField("Caption / teks narasi di video", videoCaption, { videoCaption = it }, "Tulis keterangan singkat yang tampil pada video...")
             StudioField("Lokasi berita", location, { location = it }, "Contoh: Cigombong, Kabupaten Bogor")
             }
-            Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.onGloballyPositioned { reporterSectionY = it.positionInParent().y.toInt() })
             Text("Alur kerja redaksi: cari dan telusuri sumber, catat fakta, verifikasi silang, susun naskah video orisinal, lalu minta persetujuan redaksi. Saat ini aplikasi menyediakan alur input dan pemeriksaan manual; pemantauan otomatis lintas platform, rangkuman otomatis, dan pembuatan video AI penuh belum aktif karena membutuhkan API resmi serta backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Contoh: banjir, kebijakan publik, olahraga...")
             Text("PENELUSURAN SUMBER PUBLIK", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
@@ -1108,7 +1125,7 @@ fun InfoKiniStudio() {
             Text("Periksa lisensi setiap lagu sebelum dipakai. Gunakan filter 'Attribution not required' bila tidak ingin mencantumkan kredit; lagu Creative Commons wajib diberi atribusi sesuai syarat. Pastikan lisensi mengizinkan penggunaan komersial jika konten dimonetisasi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
 
             if (selectedMedia != null && context.contentResolver.getType(selectedMedia!!)?.startsWith("image/") == true) {
-                Text("EDITOR FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("EDITOR FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.onGloballyPositioned { photoSectionY = it.positionInParent().y.toInt() })
                 Text("Kecerahan: ${photoBrightness.toInt()}", color = Color.White, fontSize = 12.sp)
                 Slider(value = photoBrightness, onValueChange = { photoBrightness = it }, valueRange = -100f..100f)
                 Text("Kontras: ${"%.1f".format(Locale.US, photoContrast)}", color = Color.White, fontSize = 12.sp)
