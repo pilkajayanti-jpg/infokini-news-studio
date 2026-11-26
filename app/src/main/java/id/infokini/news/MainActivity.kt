@@ -26,9 +26,7 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.Effects
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.OverlayEffect
-import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextOverlay
-import androidx.media3.effect.TextureOverlay
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.BackgroundColorSpan
@@ -182,27 +180,27 @@ fun InfoKiniStudio() {
                         .setClippingConfiguration(clipping)
                         .build()
                     val videoOverlays = mutableListOf<TextureOverlay>()
-                    if (headline.isNotBlank()) {
-                        val titleText = SpannableString(headline.trim())
-                        titleText.setSpan(ForegroundColorSpan(android.graphics.Color.WHITE), 0, titleText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        titleText.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(8, 13, 74)), 0, titleText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        titleText.setSpan(StyleSpan(Typeface.BOLD), 0, titleText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        val titleSettings = StaticOverlaySettings.Builder()
-                            .setOverlayFrameAnchor(-1f, -1f)
-                            .setBackgroundFrameAnchor(-0.92f, -0.62f)
-                            .build()
-                        videoOverlays.add(TextOverlay.createStaticTextOverlay(titleText, titleSettings))
-                    }
-                    if (ticker.isNotBlank()) {
-                        val tickerText = SpannableString(" INFO KINI  •  ${ticker.trim()} ")
-                        tickerText.setSpan(ForegroundColorSpan(android.graphics.Color.rgb(8, 13, 74)), 0, tickerText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        tickerText.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(19, 189, 235)), 0, tickerText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        tickerText.setSpan(StyleSpan(Typeface.BOLD), 0, tickerText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        val tickerSettings = StaticOverlaySettings.Builder()
-                            .setOverlayFrameAnchor(-1f, -1f)
-                            .setBackgroundFrameAnchor(-0.92f, -0.88f)
-                            .build()
-                        videoOverlays.add(TextOverlay.createStaticTextOverlay(tickerText, tickerSettings))
+                    val title = headline.trim()
+                    val crawl = ticker.trim()
+                    if (title.isNotBlank() || crawl.isNotBlank()) {
+                        val combined = buildString {
+                            if (title.isNotBlank()) append(title)
+                            if (title.isNotBlank() && crawl.isNotBlank()) append("\n")
+                            if (crawl.isNotBlank()) append("INFO KINI  •  ").append(crawl)
+                        }
+                        val overlayText = SpannableString(combined)
+                        if (title.isNotBlank()) {
+                            overlayText.setSpan(ForegroundColorSpan(android.graphics.Color.WHITE), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(8, 13, 74)), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        }
+                        if (crawl.isNotBlank()) {
+                            val crawlStart = combined.indexOf("INFO KINI")
+                            overlayText.setSpan(ForegroundColorSpan(android.graphics.Color.rgb(8, 13, 74)), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(19, 189, 235)), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(StyleSpan(Typeface.BOLD), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        }
+                        videoOverlays.add(TextOverlay.createStaticTextOverlay(overlayText))
                     }
                     val effects = if (videoOverlays.isNotEmpty()) {
                         Effects(emptyList(), listOf(OverlayEffect(videoOverlays)))
