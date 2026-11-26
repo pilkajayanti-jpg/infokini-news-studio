@@ -175,6 +175,7 @@ fun InfoKiniStudio() {
     var aspectMenu by remember { mutableStateOf(false) }
     var selectedMedia by remember { mutableStateOf<Uri?>(null) }
     var additionalVideoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var clipTrimPercentages by remember { mutableStateOf<Map<String, Pair<Float, Float>>>(emptyMap()) }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
     var backgroundMusicUri by remember { mutableStateOf<Uri?>(null) }
     var backgroundMusicLabel by remember { mutableStateOf("Belum ada musik dipilih") }
@@ -357,7 +358,25 @@ fun InfoKiniStudio() {
                     val editedItems = mutableListOf<EditedMediaItem>()
                     editedItems.add(EditedMediaItem.Builder(mediaItem).setEffects(effects).build())
                     additionalVideoUris.filter { it != sourceUri }.forEach { clipUri ->
-                        val clipItem = EditedMediaItem.Builder(MediaItem.fromUri(clipUri)).setEffects(effects).build()
+                        val clipMetadata = MediaMetadataRetriever()
+                        val clipDuration = try {
+                            clipMetadata.setDataSource(context, clipUri)
+                            clipMetadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                        } finally {
+                            clipMetadata.release()
+                        }
+                        val trim = clipTrimPercentages[clipUri.toString()] ?: (0f to 100f)
+                        val clipMediaItem = if (clipDuration > 0L && trim.second > trim.first) {
+                            val startMs = (clipDuration * trim.first / 100f).toLong()
+                            val endMs = (clipDuration * trim.second / 100f).toLong().coerceAtLeast(startMs + 1L)
+                            MediaItem.Builder().setUri(clipUri).setClippingConfiguration(
+                                MediaItem.ClippingConfiguration.Builder()
+                                    .setStartPositionMs(startMs)
+                                    .setEndPositionMs(endMs.coerceAtMost(clipDuration))
+                                    .build()
+                            ).build()
+                        } else MediaItem.fromUri(clipUri)
+                        val clipItem = EditedMediaItem.Builder(clipMediaItem).setEffects(effects).build()
                         editedItems.add(clipItem)
                     }
                     val composition = if (backgroundMusicEnabled && backgroundMusicUri != null) {
@@ -839,6 +858,9 @@ fun InfoKiniStudio() {
                         .putString("${projectKey}_media_uri", selectedMedia?.toString().orEmpty())
                         .putString("${projectKey}_media_label", mediaLabel)
                         .putString("${projectKey}_extra_video_uris", additionalVideoUris.joinToString("|") { it.toString() })
+                        .putString("${projectKey}_clip_trims", JSONObject().apply {
+                            clipTrimPercentages.forEach { (uri, range) -> putString(uri, "${range.first},${range.second}") }
+                        }.toString())
                         .putString("${projectKey}_music_uri", backgroundMusicUri?.toString().orEmpty())
                         .putString("${projectKey}_music_label", backgroundMusicLabel)
                         .putBoolean("${projectKey}_music_enabled", backgroundMusicEnabled)
@@ -891,6 +913,17 @@ fun InfoKiniStudio() {
                                 selectedMedia = prefs.getString("${key}_media_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
                                 mediaLabel = prefs.getString("${key}_media_label", "Belum ada media dipilih").orEmpty()
                                 additionalVideoUris = prefs.getString("${key}_extra_video_uris", "").orEmpty().split("|").filter { it.isNotBlank() }.mapNotNull { raw -> runCatching { Uri.parse(raw) }.getOrNull() }
+                                clipTrimPercentages = runCatching {
+                                    val json = JSONObject(prefs.getString("${key}_clip_trims", "{}").orEmpty())
+                                    buildMap {
+                                        val keys = json.keys()
+                                        while (keys.hasNext()) {
+                                            val uri = keys.next()
+                                            val values = json.optString(uri).split(",")
+                                            if (values.size == 2) put(uri, values[0].toFloat() to values[1].toFloat())
+                                        }
+                                    }
+                                }.getOrDefault(emptyMap())
                                 backgroundMusicUri = prefs.getString("${key}_music_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
                                 backgroundMusicLabel = prefs.getString("${key}_music_label", "Belum ada musik dipilih").orEmpty()
                                 backgroundMusicEnabled = prefs.getBoolean("${key}_music_enabled", true)
@@ -1432,10 +1465,29 @@ fun InfoKiniStudio() {
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text(
-                                        "${index + 2}. " + (clipUri.lastPathSegment?.substringAfterLast('/') ?: "Klip video"),
-                                        color = Color.White, fontSize = 10.sp, modifier = Modifier.weight(1f), maxLines = 2
-                                    )
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            "${index + 2}. " + (clipUri.lastPathSegment?.substringAfterLast('/') ?: "Klip video"),
+                                            color = Color.White, fontSize = 10.sp, maxLines = 2
+                                        )
+                                        val trimRange = clipTrimPercentages[clipUri.toString()] ?: (0f to 100f)
+                                        Text("Mulai: ${trimRange.first.toInt()}%", color = Color(0xFFB8C4D9), fontSize = 9.sp)
+                                        Slider(
+                                            value = trimRange.first,
+                                            onValueChange = { value ->
+                                                clipTrimPercentages = clipTrimPercentages + (clipUri.toString() to (value.coerceAtMost(trimRange.second - 1f).coerceAtLeast(0f) to trimRange.second))
+                                            },
+                                            valueRange = 0f..100f
+                                        )
+                                        Text("Akhir: ${trimRange.second.toInt()}%", color = Color(0xFFB8C4D9), fontSize = 9.sp)
+                                        Slider(
+                                            value = trimRange.second,
+                                            onValueChange = { value ->
+                                                clipTrimPercentages = clipTrimPercentages + (clipUri.toString() to (trimRange.first to value.coerceAtLeast(trimRange.first + 1f).coerceAtMost(100f)))
+                                            },
+                                            valueRange = 0f..100f
+                                        )
+                                    }
                                     TextButton(
                                         enabled = index > 0,
                                         onClick = {
