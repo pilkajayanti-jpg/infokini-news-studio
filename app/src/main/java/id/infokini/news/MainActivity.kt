@@ -117,6 +117,11 @@ fun InfoKiniStudio() {
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
+    val newsTemplates = listOf("Breaking News", "Berita Umum", "Olahraga", "Feature / Dokumenter", "Info Cuaca", "Wawancara")
+    var selectedNewsTemplate by remember { mutableStateOf("Berita Umum") }
+    var templateMenu by remember { mutableStateOf(false) }
+    var selectedAspectRatio by remember { mutableStateOf("16:9 • YouTube / TV") }
+    var aspectMenu by remember { mutableStateOf(false) }
     var selectedMedia by remember { mutableStateOf<Uri?>(null) }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
     var backgroundMusicUri by remember { mutableStateOf<Uri?>(null) }
@@ -231,24 +236,40 @@ fun InfoKiniStudio() {
                         .setClippingConfiguration(clipping)
                         .build()
                     val videoOverlays = mutableListOf<TextureOverlay>()
+                    val templateBaseColor = when (selectedNewsTemplate) {
+                        "Breaking News" -> android.graphics.Color.rgb(115, 12, 24)
+                        "Olahraga" -> android.graphics.Color.rgb(8, 70, 42)
+                        "Feature / Dokumenter" -> android.graphics.Color.rgb(48, 43, 35)
+                        "Info Cuaca" -> android.graphics.Color.rgb(10, 75, 105)
+                        "Wawancara" -> android.graphics.Color.rgb(55, 42, 92)
+                        else -> android.graphics.Color.rgb(8, 13, 74)
+                    }
+                    val templateAccentColor = when (selectedNewsTemplate) {
+                        "Breaking News" -> android.graphics.Color.rgb(255, 65, 65)
+                        "Olahraga" -> android.graphics.Color.rgb(111, 220, 135)
+                        "Feature / Dokumenter" -> android.graphics.Color.rgb(225, 185, 115)
+                        "Info Cuaca" -> android.graphics.Color.rgb(85, 210, 235)
+                        "Wawancara" -> android.graphics.Color.rgb(185, 155, 255)
+                        else -> android.graphics.Color.rgb(19, 189, 235)
+                    }
                     val title = headline.trim()
                     val crawl = ticker.trim()
                     if (title.isNotBlank() || crawl.isNotBlank()) {
                         val combined = buildString {
                             if (title.isNotBlank()) append(title)
                             if (title.isNotBlank() && crawl.isNotBlank()) append("\n")
-                            if (crawl.isNotBlank()) append("INFO KINI  •  ").append(crawl)
+                            if (crawl.isNotBlank()) append(selectedNewsTemplate.uppercase(Locale.ROOT)).append("  •  ").append(crawl)
                         }
                         val overlayText = SpannableString(combined)
                         if (title.isNotBlank()) {
                             overlayText.setSpan(ForegroundColorSpan(android.graphics.Color.WHITE), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            overlayText.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(8, 13, 74)), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(BackgroundColorSpan(templateBaseColor), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                             overlayText.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                         }
                         if (crawl.isNotBlank()) {
                             val crawlStart = combined.indexOf("INFO KINI")
-                            overlayText.setSpan(ForegroundColorSpan(android.graphics.Color.rgb(8, 13, 74)), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            overlayText.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(19, 189, 235)), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(ForegroundColorSpan(templateBaseColor), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(BackgroundColorSpan(templateAccentColor), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                             overlayText.setSpan(StyleSpan(Typeface.BOLD), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                         }
                         videoOverlays.add(TextOverlay.createStaticTextOverlay(overlayText))
@@ -682,6 +703,50 @@ fun InfoKiniStudio() {
             } else if (sportsNewsMode) {
                 SportsNewsEditor()
             } else {
+            Text("STUDIO VIDEO BERITA MANUAL", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("Pilih desain siap pakai, isi judul dan teks berjalan, tambahkan media, lalu ekspor video. Studio manual dapat digunakan tanpa AI Reporter.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Text("PILIH TEMPLATE BERITA", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+            Box {
+                OutlinedButton(onClick = { templateMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Template: $selectedNewsTemplate")
+                }
+                DropdownMenu(expanded = templateMenu, onDismissRequest = { templateMenu = false }) {
+                    newsTemplates.forEach { template ->
+                        DropdownMenuItem(text = { Text(template) }, onClick = {
+                            selectedNewsTemplate = template
+                            templateMenu = false
+                        })
+                    }
+                }
+            }
+            Text("FORMAT VIDEO", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+            Box {
+                OutlinedButton(onClick = { aspectMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(selectedAspectRatio)
+                }
+                DropdownMenu(expanded = aspectMenu, onDismissRequest = { aspectMenu = false }) {
+                    listOf("16:9 • YouTube / TV", "9:16 • TikTok / Reels / Shorts").forEach { ratio ->
+                        DropdownMenuItem(text = { Text(ratio) }, onClick = {
+                            selectedAspectRatio = ratio
+                            aspectMenu = false
+                        })
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    context.getSharedPreferences("infokini_templates", 0).edit()
+                        .putString("template", selectedNewsTemplate)
+                        .putString("aspect", selectedAspectRatio).apply()
+                    Toast.makeText(context, "Template favorit tersimpan", Toast.LENGTH_SHORT).show()
+                }, modifier = Modifier.weight(1f)) { Text("Simpan template") }
+                OutlinedButton(onClick = {
+                    val prefs = context.getSharedPreferences("infokini_templates", 0)
+                    selectedNewsTemplate = prefs.getString("template", "Berita Umum") ?: "Berita Umum"
+                    selectedAspectRatio = prefs.getString("aspect", "16:9 • YouTube / TV") ?: "16:9 • YouTube / TV"
+                    Toast.makeText(context, "Template favorit dimuat", Toast.LENGTH_SHORT).show()
+                }, modifier = Modifier.weight(1f)) { Text("Muat template") }
+            }
             Text("EDITOR BERITA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             StudioField("Judul berita", headline, { headline = it }, "Tulis judul berita...")
             StudioField("Teks berjalan", ticker, { ticker = it }, "Tulis running text...")
