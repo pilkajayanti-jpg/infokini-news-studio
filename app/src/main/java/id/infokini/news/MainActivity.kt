@@ -111,6 +111,7 @@ fun InfoKiniStudio() {
     }
     var reporterTopic by remember { mutableStateOf("") }
     var reporterSourceUrl by remember { mutableStateOf("") }
+    var reporterComparisonSourceUrl by remember { mutableStateOf("") }
     var reporterFacts by remember { mutableStateOf("") }
     var reporterVideoScript by remember { mutableStateOf("") }
     var reporterApproved by remember { mutableStateOf(false) }
@@ -861,22 +862,29 @@ fun InfoKiniStudio() {
                 },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Cari unggahan publik Facebook") }
-            StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL berita atau unggahan publik...")
+            StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL sumber pertama (https://...)...")
+            StudioField("Tautan sumber pembanding", reporterComparisonSourceUrl, { reporterComparisonSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL sumber independen kedua...")
+            Text("Untuk mengajukan persetujuan, cantumkan dua sumber yang benar-benar berbeda. Dua tautan ke salinan berita yang sama tidak dihitung sebagai verifikasi silang.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
             StudioField("Fakta dan hasil konfirmasi", reporterFacts, { reporterFacts = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Catat siapa, apa, kapan, di mana, bukti, dan tanggapan...")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = reporterVerified, onCheckedChange = { reporterVerified = it; reporterApproved = false; reporterMaterialAppliedToVideo = false })
                 Text("Sudah diverifikasi dan dikonfirmasi redaksi", color = Color.White, fontSize = 12.sp)
             }
             StudioField("Naskah narasi video (bukan artikel)", reporterVideoScript, { reporterVideoScript = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tulis kalimat yang akan dibacakan presenter/narator...")
-            if (reporterSourceUrl.startsWith("https://") || reporterSourceUrl.startsWith("http://")) {
-                OutlinedButton(onClick = { try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(reporterSourceUrl))) } catch (_: Exception) { Toast.makeText(context, "Tautan tidak dapat dibuka", Toast.LENGTH_SHORT).show() } }, modifier = Modifier.fillMaxWidth()) {
-                    Text("BUKA & PERIKSA SUMBER")
+            if (isValidHttpUrl(reporterSourceUrl)) {
+                OutlinedButton(onClick = { openReporterSource(context, reporterSourceUrl) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("BUKA SUMBER UTAMA")
+                }
+            }
+            if (isValidHttpUrl(reporterComparisonSourceUrl)) {
+                OutlinedButton(onClick = { openReporterSource(context, reporterComparisonSourceUrl) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("BUKA SUMBER PEMBANDING")
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = reporterApproved, onCheckedChange = { checked ->
-                    reporterApproved = checked && reporterVerified && reporterTopic.isNotBlank() && reporterSourceUrl.isNotBlank() && reporterVideoScript.isNotBlank()
-                    if (checked && !reporterApproved) Toast.makeText(context, "Lengkapi topik, sumber, naskah video, dan verifikasi terlebih dahulu", Toast.LENGTH_LONG).show()
+                    reporterApproved = checked && reporterVerified && reporterTopic.isNotBlank() && isValidHttpUrl(reporterSourceUrl) && isValidHttpUrl(reporterComparisonSourceUrl) && reporterSourceUrl.trim() != reporterComparisonSourceUrl.trim() && reporterVideoScript.isNotBlank()
+                    if (checked && !reporterApproved) Toast.makeText(context, "Persetujuan memerlukan topik, dua URL sumber berbeda yang valid, verifikasi, dan naskah video.", Toast.LENGTH_LONG).show()
                 })
                 Text("Disetujui redaksi untuk diterbitkan / diekspor", color = Color.White, fontSize = 12.sp)
             }
@@ -885,6 +893,7 @@ fun InfoKiniStudio() {
                     context.getSharedPreferences("infokini_reporter_draft", 0).edit()
                         .putString("topic", reporterTopic)
                         .putString("source", reporterSourceUrl)
+                        .putString("comparison_source", reporterComparisonSourceUrl)
                         .putString("facts", reporterFacts)
                         .putString("script", reporterVideoScript)
                         .putBoolean("verified", reporterVerified)
@@ -896,6 +905,7 @@ fun InfoKiniStudio() {
                     val prefs = context.getSharedPreferences("infokini_reporter_draft", 0)
                     reporterTopic = prefs.getString("topic", "").orEmpty()
                     reporterSourceUrl = prefs.getString("source", "").orEmpty()
+                    reporterComparisonSourceUrl = prefs.getString("comparison_source", "").orEmpty()
                     reporterFacts = prefs.getString("facts", "").orEmpty()
                     reporterVideoScript = prefs.getString("script", "").orEmpty()
                     reporterVerified = prefs.getBoolean("verified", false)
@@ -1214,6 +1224,20 @@ fun InfoKiniStudio() {
     }
 }
 
+
+private fun isValidHttpUrl(value: String): Boolean {
+    val parsed = Uri.parse(value.trim())
+    return (parsed.scheme == "https" || parsed.scheme == "http") && !parsed.host.isNullOrBlank()
+}
+
+private fun openReporterSource(context: android.content.Context, value: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(value.trim()))
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        Toast.makeText(context, "Tautan sumber tidak dapat dibuka", Toast.LENGTH_SHORT).show()
+    }
+}
 
 private fun createPhotoColorMatrix(brightness: Float, contrast: Float, saturation: Float): ColorMatrix {
     val inverse = 1f - saturation
