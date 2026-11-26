@@ -612,6 +612,32 @@ fun InfoKiniStudio() {
                     Text("Tambahkan watermark InfoKini pada foto", color = Color.White, fontSize = 12.sp)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        context.getSharedPreferences("infokini_photo_editor", 0).edit()
+                            .putFloat("brightness", photoBrightness)
+                            .putFloat("contrast", photoContrast)
+                            .putFloat("saturation", photoSaturation)
+                            .putFloat("rotation", photoRotation)
+                            .putBoolean("flip_h", photoFlipHorizontal)
+                            .putBoolean("flip_v", photoFlipVertical)
+                            .putString("caption", photoCaption)
+                            .putBoolean("watermark", photoBrandWatermark).apply()
+                        Toast.makeText(context, "Pengaturan foto tersimpan", Toast.LENGTH_SHORT).show()
+                    }, modifier = Modifier.weight(1f)) { Text("Simpan setelan") }
+                    OutlinedButton(onClick = {
+                        val prefs = context.getSharedPreferences("infokini_photo_editor", 0)
+                        photoBrightness = prefs.getFloat("brightness", 0f)
+                        photoContrast = prefs.getFloat("contrast", 1f)
+                        photoSaturation = prefs.getFloat("saturation", 1f)
+                        photoRotation = prefs.getFloat("rotation", 0f)
+                        photoFlipHorizontal = prefs.getBoolean("flip_h", false)
+                        photoFlipVertical = prefs.getBoolean("flip_v", false)
+                        photoCaption = prefs.getString("caption", "").orEmpty()
+                        photoBrandWatermark = prefs.getBoolean("watermark", true)
+                        Toast.makeText(context, "Pengaturan foto dimuat", Toast.LENGTH_SHORT).show()
+                    }, modifier = Modifier.weight(1f)) { Text("Muat setelan") }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { photoFlipHorizontal = !photoFlipHorizontal }, modifier = Modifier.weight(1f)) {
                         Text(if (photoFlipHorizontal) "Balik kiri-kanan: aktif" else "Balik kiri-kanan")
                     }
