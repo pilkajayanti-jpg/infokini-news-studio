@@ -122,6 +122,8 @@ fun InfoKiniStudio() {
     var ticker by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var projectName by remember { mutableStateOf("Proyek berita baru") }
+    var savedProjectNames by remember { mutableStateOf(context.getSharedPreferences("infokini_video_projects", 0).getStringSet("project_names", emptySet())?.toList()?.sorted().orEmpty()) }
+    var projectMenuExpanded by remember { mutableStateOf(false) }
     val newsTemplates = listOf("Breaking News", "Berita Umum", "Olahraga", "Feature / Dokumenter", "Info Cuaca", "Wawancara")
     var selectedNewsTemplate by remember { mutableStateOf("Berita Umum") }
     var templateMenu by remember { mutableStateOf(false) }
@@ -745,61 +747,76 @@ fun InfoKiniStudio() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
                     val prefs = context.getSharedPreferences("infokini_video_projects", 0)
+                    val safeName = projectName.trim().ifBlank { "Proyek berita baru" }
+                    val projectKey = "project_" + Uri.encode(safeName)
                     prefs.edit()
-                        .putString("project_name", projectName)
-                        .putString("headline", headline)
-                        .putString("ticker", ticker)
-                        .putString("location", location)
-                        .putString("template", selectedNewsTemplate)
-                        .putString("aspect", selectedAspectRatio)
-                        .putString("media_uri", selectedMedia?.toString().orEmpty())
-                        .putString("media_label", mediaLabel)
-                        .putString("music_uri", backgroundMusicUri?.toString().orEmpty())
-                        .putString("music_label", backgroundMusicLabel)
-                        .putBoolean("music_enabled", backgroundMusicEnabled)
-                        .putString("music_theme", selectedMusicTheme)
-                        .putFloat("trim_start", videoStartMs)
-                        .putFloat("trim_end", videoEndMs)
-                        .putString("reporter_topic", reporterTopic)
-                        .putString("reporter_source", reporterSourceUrl)
-                        .putString("reporter_comparison", reporterComparisonSourceUrl)
-                        .putString("reporter_facts", reporterFacts)
-                        .putString("reporter_script", reporterVideoScript)
-                        .putBoolean("reporter_material_applied", reporterMaterialAppliedToVideo)
-                        .putLong("saved_at", System.currentTimeMillis())
+                        .putString("${projectKey}_project_name", safeName)
+                        .putString("${projectKey}_headline", headline)
+                        .putString("${projectKey}_ticker", ticker)
+                        .putString("${projectKey}_location", location)
+                        .putString("${projectKey}_template", selectedNewsTemplate)
+                        .putString("${projectKey}_aspect", selectedAspectRatio)
+                        .putString("${projectKey}_media_uri", selectedMedia?.toString().orEmpty())
+                        .putString("${projectKey}_media_label", mediaLabel)
+                        .putString("${projectKey}_music_uri", backgroundMusicUri?.toString().orEmpty())
+                        .putString("${projectKey}_music_label", backgroundMusicLabel)
+                        .putBoolean("${projectKey}_music_enabled", backgroundMusicEnabled)
+                        .putString("${projectKey}_music_theme", selectedMusicTheme)
+                        .putFloat("${projectKey}_trim_start", videoStartMs)
+                        .putFloat("${projectKey}_trim_end", videoEndMs)
+                        .putString("${projectKey}_reporter_topic", reporterTopic)
+                        .putString("${projectKey}_reporter_source", reporterSourceUrl)
+                        .putString("${projectKey}_reporter_comparison", reporterComparisonSourceUrl)
+                        .putString("${projectKey}_reporter_facts", reporterFacts)
+                        .putString("${projectKey}_reporter_script", reporterVideoScript)
+                        .putBoolean("${projectKey}_reporter_material_applied", reporterMaterialAppliedToVideo)
+                        .putLong("${projectKey}_saved_at", System.currentTimeMillis())
+                        .putStringSet("project_names", (savedProjectNames + safeName).toSet())
                         .apply()
-                    Toast.makeText(context, "Proyek video tersimpan di perangkat", Toast.LENGTH_SHORT).show()
+                    savedProjectNames = (savedProjectNames + safeName).distinct().sorted()
+                    projectName = safeName
+                    Toast.makeText(context, "Proyek '$safeName' tersimpan. Total: ${savedProjectNames.size}", Toast.LENGTH_SHORT).show()
                 }, modifier = Modifier.weight(1f)) { Text("Simpan proyek") }
-                OutlinedButton(onClick = {
-                    val prefs = context.getSharedPreferences("infokini_video_projects", 0)
-                    if (!prefs.contains("project_name")) {
-                        Toast.makeText(context, "Belum ada proyek tersimpan", Toast.LENGTH_SHORT).show()
-                    } else {
-                        projectName = prefs.getString("project_name", "Proyek berita").orEmpty()
-                        headline = prefs.getString("headline", "").orEmpty()
-                        ticker = prefs.getString("ticker", "").orEmpty()
-                        location = prefs.getString("location", "").orEmpty()
-                        selectedNewsTemplate = prefs.getString("template", "Berita Umum").orEmpty()
-                        selectedAspectRatio = prefs.getString("aspect", "16:9 • YouTube / TV").orEmpty()
-                        selectedMedia = prefs.getString("media_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
-                        mediaLabel = prefs.getString("media_label", "Belum ada media dipilih").orEmpty()
-                        backgroundMusicUri = prefs.getString("music_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
-                        backgroundMusicLabel = prefs.getString("music_label", "Belum ada musik dipilih").orEmpty()
-                        backgroundMusicEnabled = prefs.getBoolean("music_enabled", true)
-                        selectedMusicTheme = prefs.getString("music_theme", "InfoKini News Theme").orEmpty()
-                        videoStartMs = prefs.getFloat("trim_start", 0f)
-                        videoEndMs = prefs.getFloat("trim_end", 0f)
-                        reporterTopic = prefs.getString("reporter_topic", "").orEmpty()
-                        reporterSourceUrl = prefs.getString("reporter_source", "").orEmpty()
-                        reporterComparisonSourceUrl = prefs.getString("reporter_comparison", "").orEmpty()
-                        reporterFacts = prefs.getString("reporter_facts", "").orEmpty()
-                        reporterVideoScript = prefs.getString("reporter_script", "").orEmpty()
-                        reporterVerified = false
-                        reporterApproved = false
-                        reporterMaterialAppliedToVideo = prefs.getBoolean("reporter_material_applied", false)
-                        Toast.makeText(context, "Proyek dimuat. Verifikasi dan persetujuan redaksi harus dilakukan ulang.", Toast.LENGTH_LONG).show()
+                Box(Modifier.weight(1f)) {
+                    OutlinedButton(onClick = {
+                        val prefs = context.getSharedPreferences("infokini_video_projects", 0)
+                        savedProjectNames = prefs.getStringSet("project_names", emptySet())?.toList()?.sorted().orEmpty()
+                        if (savedProjectNames.isEmpty()) Toast.makeText(context, "Belum ada proyek tersimpan", Toast.LENGTH_SHORT).show()
+                        else projectMenuExpanded = true
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Muat proyek") }
+                    DropdownMenu(expanded = projectMenuExpanded, onDismissRequest = { projectMenuExpanded = false }) {
+                        savedProjectNames.forEach { savedName ->
+                            DropdownMenuItem(text = { Text(savedName) }, onClick = {
+                                val prefs = context.getSharedPreferences("infokini_video_projects", 0)
+                                val key = "project_" + Uri.encode(savedName)
+                                projectName = prefs.getString("${key}_project_name", savedName).orEmpty()
+                                headline = prefs.getString("${key}_headline", "").orEmpty()
+                                ticker = prefs.getString("${key}_ticker", "").orEmpty()
+                                location = prefs.getString("${key}_location", "").orEmpty()
+                                selectedNewsTemplate = prefs.getString("${key}_template", "Berita Umum").orEmpty()
+                                selectedAspectRatio = prefs.getString("${key}_aspect", "16:9 • YouTube / TV").orEmpty()
+                                selectedMedia = prefs.getString("${key}_media_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
+                                mediaLabel = prefs.getString("${key}_media_label", "Belum ada media dipilih").orEmpty()
+                                backgroundMusicUri = prefs.getString("${key}_music_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
+                                backgroundMusicLabel = prefs.getString("${key}_music_label", "Belum ada musik dipilih").orEmpty()
+                                backgroundMusicEnabled = prefs.getBoolean("${key}_music_enabled", true)
+                                selectedMusicTheme = prefs.getString("${key}_music_theme", "InfoKini News Theme").orEmpty()
+                                videoStartMs = prefs.getFloat("${key}_trim_start", 0f)
+                                videoEndMs = prefs.getFloat("${key}_trim_end", 0f)
+                                reporterTopic = prefs.getString("${key}_reporter_topic", "").orEmpty()
+                                reporterSourceUrl = prefs.getString("${key}_reporter_source", "").orEmpty()
+                                reporterComparisonSourceUrl = prefs.getString("${key}_reporter_comparison", "").orEmpty()
+                                reporterFacts = prefs.getString("${key}_reporter_facts", "").orEmpty()
+                                reporterVideoScript = prefs.getString("${key}_reporter_script", "").orEmpty()
+                                reporterVerified = false
+                                reporterApproved = false
+                                reporterMaterialAppliedToVideo = prefs.getBoolean("${key}_reporter_material_applied", false)
+                                projectMenuExpanded = false
+                                Toast.makeText(context, "Proyek dimuat. Verifikasi dan persetujuan redaksi harus dilakukan ulang.", Toast.LENGTH_LONG).show()
+                            })
+                        }
                     }
-                }, modifier = Modifier.weight(1f)) { Text("Muat proyek") }
+                }
             }
             Text("PILIH TEMPLATE BERITA", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             Box {
