@@ -222,6 +222,32 @@ fun InfoKiniStudio() {
             .putString("clip_trims", trims.toString())
             .apply()
     }
+    LaunchedEffect(selectedMedia) {
+        val mediaUri = selectedMedia
+        if (mediaUri != null) {
+            mediaLabel = mediaUri.lastPathSegment ?: "Media tersimpan"
+            val duration = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (context.contentResolver.getType(mediaUri)?.startsWith("video/") == true) {
+                        val retriever = MediaMetadataRetriever()
+                        try {
+                            retriever.setDataSource(context, mediaUri)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                        } finally {
+                            retriever.release()
+                        }
+                    } else 0L
+                }.getOrDefault(0L)
+            }
+            videoDurationMs = duration
+            videoStartMs = 0f
+            videoEndMs = duration.toFloat()
+        } else {
+            videoDurationMs = 0L
+            videoStartMs = 0f
+            videoEndMs = 0f
+        }
+    }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
     val audioPreferences = remember { context.getSharedPreferences("infokini_audio", 0) }
     var backgroundMusicUri by remember { mutableStateOf(audioPreferences.getString("music_uri", null)?.let { Uri.parse(it) }) }
