@@ -1012,6 +1012,13 @@ fun InfoKiniStudio() {
                 },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Cari unggahan publik Facebook") }
+            OutlinedButton(
+                onClick = {
+                    if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                    else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$encodedReporterQuery")))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Cari di Google Web") }
             StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL sumber pertama (https://...)...")
             StudioField("Tautan sumber pembanding", reporterComparisonSourceUrl, { reporterComparisonSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL sumber independen kedua...")
             Text("Persetujuan mensyaratkan dua URL valid dari domain berbeda dan catatan fakta. Domain berbeda hanya pemeriksaan awal; redaksi tetap wajib memastikan penerbit benar-benar independen, bukan salinan/sindikasi, serta isi kedua sumber mendukung fakta.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
