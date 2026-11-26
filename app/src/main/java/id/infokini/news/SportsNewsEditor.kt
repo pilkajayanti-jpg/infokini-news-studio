@@ -59,6 +59,27 @@ fun SportsNewsEditor() {
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(onClick = {
+            context.getSharedPreferences("infokini_sports", 0).edit()
+                .putString("category", category).putString("headline", headline)
+                .putString("body", body).putString("competition", competition)
+                .putString("source", source).putString("ticker", ticker)
+                .putString("status", status).apply()
+            android.widget.Toast.makeText(context, "Draf olahraga tersimpan", android.widget.Toast.LENGTH_SHORT).show()
+        }, modifier = Modifier.weight(1f)) { Text("Simpan draf") }
+        OutlinedButton(onClick = {
+            val prefs = context.getSharedPreferences("infokini_sports", 0)
+            category = prefs.getString("category", category) ?: category
+            headline = prefs.getString("headline", "").orEmpty()
+            body = prefs.getString("body", "").orEmpty()
+            competition = prefs.getString("competition", "").orEmpty()
+            source = prefs.getString("source", "").orEmpty()
+            ticker = prefs.getString("ticker", "").orEmpty()
+            status = prefs.getString("status", "Menunggu verifikasi") ?: "Menunggu verifikasi"
+            android.widget.Toast.makeText(context, "Draf olahraga dimuat", android.widget.Toast.LENGTH_SHORT).show()
+        }, modifier = Modifier.weight(1f)) { Text("Muat draf") }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = {
             val draft = "[$category] $headline\n\n$body\n\nKompetisi/Lokasi: $competition\nSumber: $source\nStatus: $status"
             val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, draft) }
             context.startActivity(Intent.createChooser(intent, "Bagikan draf berita"))
