@@ -27,6 +27,7 @@ import androidx.media3.transformer.Effects
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.TextOverlay
+import androidx.media3.effect.TextureOverlay
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.BackgroundColorSpan
