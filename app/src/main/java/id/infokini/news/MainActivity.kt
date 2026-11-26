@@ -174,6 +174,7 @@ fun InfoKiniStudio() {
     var selectedAspectRatio by remember { mutableStateOf("16:9 • YouTube / TV") }
     var aspectMenu by remember { mutableStateOf(false) }
     var selectedMedia by remember { mutableStateOf<Uri?>(null) }
+    var additionalVideoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
     var backgroundMusicUri by remember { mutableStateOf<Uri?>(null) }
     var backgroundMusicLabel by remember { mutableStateOf("Belum ada musik dipilih") }
@@ -255,6 +256,16 @@ fun InfoKiniStudio() {
             } catch (_: Exception) {
                 // Some document providers do not offer persistable permissions.
             }
+        }
+    }
+    val multiClipPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val validVideos = uris.filter { uri ->
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
+            context.contentResolver.getType(uri)?.startsWith("video/") == true
+        }
+        additionalVideoUris = (additionalVideoUris + validVideos).distinct().filter { it != selectedMedia }
+        if (validVideos.size != uris.size) {
+            Toast.makeText(context, "Hanya file video yang ditambahkan ke timeline", Toast.LENGTH_SHORT).show()
         }
     }
     val musicPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -343,15 +354,20 @@ fun InfoKiniStudio() {
                         videoEffects.add(OverlayEffect(videoOverlays))
                     }
                     val effects = Effects(emptyList(), videoEffects)
-                    val editedItem = EditedMediaItem.Builder(mediaItem).setEffects(effects).build()
+                    val editedItems = mutableListOf<EditedMediaItem>()
+                    editedItems.add(EditedMediaItem.Builder(mediaItem).setEffects(effects).build())
+                    additionalVideoUris.filter { it != sourceUri }.forEach { clipUri ->
+                        val clipItem = EditedMediaItem.Builder(MediaItem.fromUri(clipUri)).setEffects(effects).build()
+                        editedItems.add(clipItem)
+                    }
                     val composition = if (backgroundMusicEnabled && backgroundMusicUri != null) {
-                        val videoSequence = EditedMediaItemSequence.withAudioAndVideoFrom(listOf(editedItem))
+                        val videoSequence = EditedMediaItemSequence.withAudioAndVideoFrom(editedItems)
                         val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(backgroundMusicUri!!)).build()
                         val musicSequence = EditedMediaItemSequence.withAudioFrom(listOf(musicItem))
                             .buildUpon().setIsLooping(true).build()
                         Composition.Builder(videoSequence, musicSequence).build()
                     } else {
-                        Composition.Builder(EditedMediaItemSequence.withAudioAndVideoFrom(listOf(editedItem))).build()
+                        Composition.Builder(EditedMediaItemSequence.withAudioAndVideoFrom(editedItems)).build()
                     }
                     val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
                     val transformer = Transformer.Builder(context)
@@ -822,6 +838,7 @@ fun InfoKiniStudio() {
                         .putString("${projectKey}_aspect", selectedAspectRatio)
                         .putString("${projectKey}_media_uri", selectedMedia?.toString().orEmpty())
                         .putString("${projectKey}_media_label", mediaLabel)
+                        .putString("${projectKey}_extra_video_uris", additionalVideoUris.joinToString("|") { it.toString() })
                         .putString("${projectKey}_music_uri", backgroundMusicUri?.toString().orEmpty())
                         .putString("${projectKey}_music_label", backgroundMusicLabel)
                         .putBoolean("${projectKey}_music_enabled", backgroundMusicEnabled)
@@ -873,6 +890,7 @@ fun InfoKiniStudio() {
                                 selectedAspectRatio = prefs.getString("${key}_aspect", "16:9 • YouTube / TV").orEmpty()
                                 selectedMedia = prefs.getString("${key}_media_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
                                 mediaLabel = prefs.getString("${key}_media_label", "Belum ada media dipilih").orEmpty()
+                                additionalVideoUris = prefs.getString("${key}_extra_video_uris", "").orEmpty().split("|").filter { it.isNotBlank() }.mapNotNull { raw -> runCatching { Uri.parse(raw) }.getOrNull() }
                                 backgroundMusicUri = prefs.getString("${key}_music_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
                                 backgroundMusicLabel = prefs.getString("${key}_music_label", "Belum ada musik dipilih").orEmpty()
                                 backgroundMusicEnabled = prefs.getBoolean("${key}_music_enabled", true)
@@ -1397,6 +1415,21 @@ fun InfoKiniStudio() {
                             onValueChange = { videoEndMs = it.coerceAtLeast(videoStartMs + 1000f) },
                             valueRange = 1000f..videoDurationMs.toFloat()
                         )
+                        OutlinedButton(
+                            onClick = { multiClipPicker.launch(arrayOf("video/*")) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("TAMBAH KLIP VIDEO KE TIMELINE (" + additionalVideoUris.size + ")")
+                        }
+                        if (additionalVideoUris.isNotEmpty()) {
+                            Text(
+                                "Urutan klip: video utama + " + additionalVideoUris.size + " klip tambahan. Klip tambahan akan disambung berurutan saat ekspor.",
+                                color = Color(0xFFB8C4D9), fontSize = 11.sp
+                            )
+                            OutlinedButton(onClick = { additionalVideoUris = emptyList() }, modifier = Modifier.fillMaxWidth()) {
+                                Text("KOSONGKAN KLIP TAMBAHAN")
+                            }
+                        }
                         Button(
                             onClick = {
                                 if (reporterMaterialAppliedToVideo && !reporterApproved) {
