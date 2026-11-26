@@ -955,12 +955,34 @@ fun InfoKiniStudio() {
                                 border = androidx.compose.foundation.BorderStroke(if (chosen) 2.dp else 1.dp, if (chosen) Cyan else Color(0xFF34415F))
                             ) {
                                 Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                    Box(Modifier.fillMaxWidth().height(76.dp).background(base, RoundedCornerShape(7.dp)).padding(7.dp), contentAlignment = Alignment.BottomStart) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                            Text("INFOKINI", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black)
-                                            Box(Modifier.fillMaxWidth().height(5.dp).background(Color.White.copy(alpha = 0.85f), RoundedCornerShape(2.dp)))
-                                            Box(Modifier.fillMaxWidth(0.65f).height(5.dp).background(Cyan, RoundedCornerShape(2.dp)))
-                                            Text("infokini.news", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    Column(
+                                        Modifier.fillMaxWidth().height(92.dp).background(base, RoundedCornerShape(7.dp)).padding(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("INFOKINI.NEWS", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black)
+                                            Text(if (template == "Breaking News") "LIVE" else "INFO", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Box(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF263653), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
+                                            Text(
+                                                when (template) {
+                                                    "Liputan Desa" -> "LIPUTAN LAPANGAN"
+                                                    "Wawancara" -> "NARASUMBER"
+                                                    "Olahraga" -> "SKOR • OLAHRAGA"
+                                                    "Info Cuaca" -> "INFO CUACA"
+                                                    "Ekonomi / UMKM" -> "EKONOMI & UMKM"
+                                                    "Vertikal Sosial Media" -> "VIDEO VERTIKAL"
+                                                    "Kriminal" -> "KABAR TERKINI"
+                                                    "Dokumenter" -> "DOKUMENTER"
+                                                    else -> "VISUAL BERITA"
+                                                },
+                                                color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Box(Modifier.fillMaxWidth(0.88f).height(5.dp).background(Color.White, RoundedCornerShape(2.dp)))
+                                        Box(Modifier.fillMaxWidth(0.58f).height(4.dp).background(Cyan, RoundedCornerShape(2.dp)))
+                                        Box(Modifier.fillMaxWidth().height(7.dp).background(Color(0xFF080D25), RoundedCornerShape(2.dp)), contentAlignment = Alignment.CenterStart) {
+                                            Text("INFO TERKINI • INFOKINI.NEWS", color = Color.White, fontSize = 5.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                     Text(template, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
