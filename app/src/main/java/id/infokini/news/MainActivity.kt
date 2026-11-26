@@ -808,6 +808,30 @@ fun InfoKiniStudio() {
                 })
                 Text("Disetujui redaksi untuk diterbitkan / diekspor", color = Color.White, fontSize = 12.sp)
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    context.getSharedPreferences("infokini_reporter_draft", 0).edit()
+                        .putString("topic", reporterTopic)
+                        .putString("source", reporterSourceUrl)
+                        .putString("facts", reporterFacts)
+                        .putString("script", reporterVideoScript)
+                        .putBoolean("verified", reporterVerified)
+                        .putBoolean("approved", reporterApproved)
+                        .apply()
+                    Toast.makeText(context, "Draf AI Reporter tersimpan di perangkat", Toast.LENGTH_SHORT).show()
+                }, modifier = Modifier.weight(1f)) { Text("SIMPAN DRAF REPORTER") }
+                OutlinedButton(onClick = {
+                    val prefs = context.getSharedPreferences("infokini_reporter_draft", 0)
+                    reporterTopic = prefs.getString("topic", "").orEmpty()
+                    reporterSourceUrl = prefs.getString("source", "").orEmpty()
+                    reporterFacts = prefs.getString("facts", "").orEmpty()
+                    reporterVideoScript = prefs.getString("script", "").orEmpty()
+                    reporterVerified = prefs.getBoolean("verified", false)
+                    // Persetujuan tidak dipulihkan otomatis agar draf yang dimuat harus ditinjau ulang.
+                    reporterApproved = false
+                    Toast.makeText(context, "Draf dimuat. Persetujuan redaksi harus diberikan ulang.", Toast.LENGTH_SHORT).show()
+                }, modifier = Modifier.weight(1f)) { Text("MUAT DRAF REPORTER") }
+            }
             Text(if (reporterApproved) "Status: DISETUJUI REDAKSI" else "Status: DRAF — BELUM BOLEH DITERBITKAN", color = if (reporterApproved) Color(0xFF7EE0A3) else Color(0xFFFFD27A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Text("Catatan hak cipta: naskah narasi harus orisinal. Jangan menyalin artikel atau memakai foto, video, musik, maupun logo pihak lain tanpa izin/lisensi yang sesuai. Sumber informasi tetap dicantumkan pada catatan produksi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
             Button(onClick = {
