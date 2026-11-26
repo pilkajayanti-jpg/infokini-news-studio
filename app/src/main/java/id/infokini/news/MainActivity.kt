@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.util.Locale
 import java.net.URL
 import java.net.URLEncoder
@@ -55,6 +56,7 @@ private enum class Page { HOME, VIDEO, PHOTO, TEMPLATE, EDITORIAL, PRESENTER, SP
 @Composable
 private fun InfoKiniApp() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("infokini_v3", Context.MODE_PRIVATE) }
     var page by remember { mutableStateOf(Page.HOME) }
     var headline by remember { mutableStateOf(prefs.getString("headline", "").orEmpty()) }
@@ -120,7 +122,7 @@ private fun InfoKiniApp() {
                     Page.PHOTO -> PhotoPage(photo) { pickPhoto.launch(arrayOf("image/*")) }
                     Page.TEMPLATE -> TemplatePage(template) { template = it; page = Page.VIDEO }
                     Page.EDITORIAL -> EditorialPage(topic, { topic = it }, sourceA, { sourceA = it }, sourceB, { sourceB = it }, script, { script = it }, results, searchStatus, {
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                        scope.launch {
                             searchStatus = "Mengambil hasil pencarian..."
                             try {
                                 results = getNewsHeadlines(topic)
