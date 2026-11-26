@@ -64,6 +64,8 @@ import kotlinx.coroutines.withContext
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import java.net.URL
+import java.net.HttpURLConnection
+import org.json.JSONObject
 import java.net.URLEncoder
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.Locale
@@ -123,6 +125,9 @@ fun InfoKiniStudio() {
             else -> { tts.setSpeechRate(0.94f); tts.setPitch(1.0f) }
         }
     }
+    var aiBackendUrl by remember { mutableStateOf(context.getSharedPreferences("infokini_ai", 0).getString("backend_url", "").orEmpty()) }
+    var aiGenerating by remember { mutableStateOf(false) }
+    var aiBackendStatus by remember { mutableStateOf("Backend AI belum dikonfigurasi.") }
     var reporterTopic by remember { mutableStateOf("") }
     var rssNewsItems by remember { mutableStateOf<List<ReporterRssItem>>(emptyList()) }
     var rssLoading by remember { mutableStateOf(false) }
@@ -584,7 +589,7 @@ fun InfoKiniStudio() {
                 FilterChip(selected = footballMode, onClick = { footballMode = true; sportsNewsMode = false }, label = { Text("Skor Bola") })
                 FilterChip(selected = sportsNewsMode, onClick = { sportsNewsMode = true; footballMode = false }, label = { Text("Berita Olahraga") })
             }
-            Text("MENU FITUR • VERSI 2.2", color = Color(0xFFB8C4D9), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("MENU FITUR • VERSI 2.4", color = Color(0xFFB8C4D9), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("VIDEO", fontSize = 10.sp) }
                 OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(reporterSectionY.coerceAtLeast(0)) } }, modifier = Modifier.weight(1f)) { Text("AI REPORTER", fontSize = 10.sp) }
@@ -946,6 +951,8 @@ fun InfoKiniStudio() {
             }
             Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.onGloballyPositioned { reporterSectionY = it.positionInParent().y.toInt() })
             Text("Alur kerja redaksi: cari dan telusuri sumber, catat fakta, verifikasi silang, susun naskah video orisinal, lalu minta persetujuan redaksi. Saat ini aplikasi menyediakan alur input dan pemeriksaan manual; pemantauan otomatis lintas platform, rangkuman otomatis, dan pembuatan video AI penuh belum aktif karena membutuhkan API resmi serta backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            StudioField("Alamat Backend AI (HTTPS)", aiBackendUrl, { aiBackendUrl = it.trim(); context.getSharedPreferences("infokini_ai", 0).edit().putString("backend_url", it.trim()).apply() }, "https://alamat-server-anda.example")
+            Text(aiBackendStatus, color = Color(0xFFB8C4D9), fontSize = 10.sp)
             StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Contoh: banjir, kebijakan publik, olahraga...")
             Text("PENCARIAN BERITA OTOMATIS • GOOGLE NEWS RSS", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             Text("Mengambil judul, waktu terbit, dan tautan berita terbaru berdasarkan topik. Ini pencarian RSS otomatis, bukan pemantauan semua platform atau verifikasi fakta otomatis.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
@@ -1077,6 +1084,32 @@ fun InfoKiniStudio() {
                 Text("Sudah diverifikasi dan dikonfirmasi redaksi", color = Color.White, fontSize = 12.sp)
             }
             StudioField("Naskah narasi video (bukan artikel)", reporterVideoScript, { reporterVideoScript = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tulis kalimat yang akan dibacakan presenter/narator...")
+            Button(onClick = {
+                if (aiBackendUrl.isBlank() || !isValidHttpsUrl(aiBackendUrl)) {
+                    aiBackendStatus = "Masukkan alamat backend HTTPS yang sudah dipasang terlebih dahulu."
+                    Toast.makeText(context, aiBackendStatus, Toast.LENGTH_LONG).show()
+                } else if (reporterTopic.isBlank() || reporterFacts.isBlank()) {
+                    Toast.makeText(context, "Isi topik dan fakta/hasil konfirmasi terlebih dahulu.", Toast.LENGTH_LONG).show()
+                } else {
+                    screenScope.launch {
+                        aiGenerating = true
+                        aiBackendStatus = "Menghubungi backend AI..."
+                        reporterApproved = false
+                        reporterMaterialAppliedToVideo = false
+                        try {
+                            val generated = generateNewsScriptWithBackend(aiBackendUrl, reporterTopic, reporterFacts, reporterSourceUrl, reporterComparisonSourceUrl)
+                            headline = generated.optString("headline", headline)
+                            ticker = generated.optString("ticker", ticker)
+                            reporterVideoScript = generated.optString("script", reporterVideoScript)
+                            aiBackendStatus = "Draf AI dibuat. Periksa fakta dan sumber; AI tidak menggantikan verifikasi redaksi."
+                        } catch (error: Exception) {
+                            aiBackendStatus = "Gagal: \${error.message ?: "backend tidak dapat dihubungi"}"
+                        } finally { aiGenerating = false }
+                    }
+                }
+            }, enabled = !aiGenerating, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)) {
+                Text(if (aiGenerating) "AI SEDANG MENYUSUN NASKAH..." else "BUAT NASKAH VIDEO DENGAN AI", fontWeight = FontWeight.Black)
+            }
             if (isValidHttpUrl(reporterSourceUrl)) {
                 OutlinedButton(onClick = { openReporterSource(context, reporterSourceUrl) }, modifier = Modifier.fillMaxWidth()) {
                     Text("BUKA SUMBER UTAMA")
@@ -1431,6 +1464,48 @@ fun InfoKiniStudio() {
     }
 }
 
+
+
+
+internal fun isValidHttpsUrl(value: String): Boolean = try {
+    val parsed = URI(value.trim())
+    parsed.scheme.equals("https", ignoreCase = true) && !parsed.host.isNullOrBlank()
+} catch (_: Exception) { false }
+
+private suspend fun generateNewsScriptWithBackend(
+    baseUrl: String,
+    topic: String,
+    facts: String,
+    sourceOne: String,
+    sourceTwo: String
+): JSONObject = withContext(Dispatchers.IO) {
+    val normalizedBase = baseUrl.trim().trimEnd('/')
+    val connection = (URL("\${normalizedBase}/api/news-script").openConnection() as HttpURLConnection).apply {
+        requestMethod = "POST"
+        connectTimeout = 15000
+        readTimeout = 60000
+        doOutput = true
+        setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        setRequestProperty("Accept", "application/json")
+    }
+    try {
+        val payload = JSONObject()
+            .put("topic", topic)
+            .put("facts", facts)
+            .put("sources", org.json.JSONArray().put(sourceOne).put(sourceTwo))
+        connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+        val status = connection.responseCode
+        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+        val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+        if (status !in 200..299) {
+            val message = try { JSONObject(body).optString("error", "HTTP \$status") } catch (_: Exception) { "HTTP \$status" }
+            throw IllegalStateException(message)
+        }
+        val result = JSONObject(body)
+        if (result.optString("script").isBlank()) throw IllegalStateException("Backend tidak mengembalikan naskah.")
+        result
+    } finally { connection.disconnect() }
+}
 
 internal data class ReporterRssItem(val title: String, val link: String, val published: String, val source: String)
 
