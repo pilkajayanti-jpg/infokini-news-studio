@@ -30,6 +30,7 @@ export default {
     if (url.pathname !== "/api/news-script") return json({ error: "Not found" }, 404);
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
     if (!env.OPENAI_API_KEY) return json({ error: "Backend belum memiliki OPENAI_API_KEY." }, 503);
+    if (!env.OPENAI_MODEL) return json({ error: "Backend belum memiliki OPENAI_MODEL yang valid. Atur model API yang tersedia di akun OpenAI Anda." }, 503);
 
     const declaredLength = Number(request.headers.get("content-length") || 0);
     if (declaredLength > 24000) return json({ error: "Permintaan terlalu besar." }, 413);
@@ -72,7 +73,7 @@ export default {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: env.OPENAI_MODEL || "gpt-6.2-astra",
+          model: env.OPENAI_MODEL,
           instructions,
           input,
           max_output_tokens: 1200,
