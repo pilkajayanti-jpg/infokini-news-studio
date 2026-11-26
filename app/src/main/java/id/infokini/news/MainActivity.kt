@@ -112,6 +112,7 @@ fun InfoKiniStudio() {
     var photoSectionY by remember { mutableIntStateOf(0) }
     var ttsReady by remember { mutableStateOf(false) }
     var narrationAudioFile by remember { mutableStateOf<File?>(null) }
+    var narrationAudioScript by remember { mutableStateOf("") }
     var narrationGenerating by remember { mutableStateOf(false) }
     var ttsVoiceNames by remember { mutableStateOf(listOf("Default Android")) }
     var selectedTtsVoice by remember { mutableStateOf("Default Android") }
@@ -303,6 +304,8 @@ fun InfoKiniStudio() {
             val sourceUri = selectedMedia
             if (sourceUri == null || videoDurationMs <= 0L) {
                 Toast.makeText(context, "Pilih video yang valid terlebih dahulu", Toast.LENGTH_LONG).show()
+            } else if (narrationGenerating) {
+                Toast.makeText(context, "Tunggu sampai audio narator selesai dibuat", Toast.LENGTH_LONG).show()
             } else if (videoEndMs.toLong() <= videoStartMs.toLong()) {
                 Toast.makeText(context, "Waktu akhir harus lebih besar dari waktu awal", Toast.LENGTH_LONG).show()
             } else {
@@ -402,7 +405,8 @@ fun InfoKiniStudio() {
                                 .buildUpon().setIsLooping(true).build()
                         )
                     }
-                    narrationAudioFile?.takeIf { it.exists() && it.length() > 0L }?.let { narrationFile ->
+                    val currentNarrationScript = listOf(headline.trim(), ticker.trim(), videoCaption.trim()).filter { it.isNotBlank() }.joinToString(". ")
+                    narrationAudioFile?.takeIf { it.exists() && it.length() > 0L && narrationAudioScript == currentNarrationScript }?.let { narrationFile ->
                         val narrationItem = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narrationFile))).build()
                         compositionSequences.add(EditedMediaItemSequence.withAudioFrom(listOf(narrationItem)))
                     }
@@ -1714,6 +1718,7 @@ fun InfoKiniStudio() {
                             override fun onDone(utteranceId: String?) {
                                 Handler(Looper.getMainLooper()).post {
                                     narrationAudioFile = narrationFile
+                                    narrationAudioScript = script
                                     narrationGenerating = false
                                     Toast.makeText(context, "Audio narator siap dan akan disertakan saat ekspor MP4", Toast.LENGTH_LONG).show()
                                 }
