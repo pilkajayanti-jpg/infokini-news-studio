@@ -1,6 +1,18 @@
 package id.infokini.news
 
 import android.content.Context
+import android.Manifest
+import android.content.ContentValues
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -300,6 +312,40 @@ private fun PhotoPage(
     rotation: Float, onRotation: (Float) -> Unit,
     pick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val exportPhotoNow = {
+        try {
+            val source = context.contentResolver.openInputStream(photo!!)
+            val original = source?.use { BitmapFactory.decodeStream(it) } ?: throw IllegalStateException("Foto tidak dapat dibaca")
+            val color = android.graphics.ColorMatrix().apply { setSaturation(saturation.coerceIn(0f, 2f)) }
+            val cv = contrast.coerceIn(0f, 2f)
+            val bv = brightness.coerceIn(-1f, 1f) * 255f
+            val cm = android.graphics.ColorMatrix(floatArrayOf(cv,0f,0f,0f,128f*(1f-cv)+bv, 0f,cv,0f,0f,128f*(1f-cv)+bv, 0f,0f,cv,0f,128f*(1f-cv)+bv, 0f,0f,0f,1f,0f))
+            color.postConcat(cm)
+            val matrix = Matrix().apply { postRotate(rotation) }
+            val rotated = Bitmap.createBitmap(original, 0, 0, original.width, original.height, matrix, true)
+            val output = Bitmap.createBitmap(rotated.width, rotated.height, Bitmap.Config.ARGB_8888)
+            Canvas(output).drawBitmap(rotated, 0f, 0f, Paint().apply { colorFilter = android.graphics.ColorMatrixColorFilter(color) })
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "InfoKini_Foto_${System.currentTimeMillis()}.jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                if (Build.VERSION.SDK_INT >= 29) put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/InfoKini")
+            }
+            val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: throw IllegalStateException("Tidak dapat membuat file")
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                if (!output.compress(Bitmap.CompressFormat.JPEG, 92, stream)) throw IllegalStateException("Gagal menyimpan gambar")
+            } ?: throw IllegalStateException("Tidak dapat menulis file")
+            Toast.makeText(context, "Foto hasil edit tersimpan di Galeri / Pictures / InfoKini", Toast.LENGTH_LONG).show()
+            original.recycle()
+            if (rotated !== original) rotated.recycle()
+            output.recycle()
+        } catch (error: Exception) {
+            Toast.makeText(context, "Ekspor gagal: ${error.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) exportPhotoNow() else Toast.makeText(context, "Izin penyimpanan diperlukan di Android 9", Toast.LENGTH_LONG).show()
+    }
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         PageHeading("RUANG PRODUKSI / 02", "Editor Foto", "Atur tampilan dasar foto untuk materi berita.")
         CardBlock {
@@ -340,6 +386,11 @@ private fun PhotoPage(
                     OutlinedButton(onClick = { onRotation((rotation + 90f) % 360f) }, modifier = Modifier.weight(1f)) { Text("PUTAR KANAN") }
                 }
                 ActionButton("RESET PENYESUAIAN", { onBrightness(0f); onContrast(1f); onSaturation(1f); onRotation(0f) })
+                ActionButton("EKSPOR FOTO HASIL EDIT", {
+                    if (Build.VERSION.SDK_INT <= 28 && context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                        permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    } else exportPhotoNow()
+                }, true)
             }
             ActionButton("＋ PILIH FOTO", pick, true)
             Text("Penyesuaian tampil di pratinjau dan tersimpan pada proyek. Ekspor poster final belum diaktifkan.", color = Gold, fontSize = 11.sp)
