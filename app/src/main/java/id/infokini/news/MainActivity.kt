@@ -155,7 +155,7 @@ fun InfoKiniStudio() {
     var savedProjectNames by remember { mutableStateOf(context.getSharedPreferences("infokini_video_projects", 0).getStringSet("project_names", emptySet())?.toList()?.sorted().orEmpty()) }
     var projectMenuExpanded by remember { mutableStateOf(false) }
     var projectPendingDelete by remember { mutableStateOf<String?>(null) }
-    val newsTemplates = listOf("Breaking News", "Berita Umum", "Olahraga", "Feature / Dokumenter", "Info Cuaca", "Wawancara")
+    val newsTemplates = listOf("Breaking News", "Berita Umum", "Liputan Desa", "Wawancara", "Olahraga", "Info Cuaca", "Dokumenter", "Kriminal", "Ekonomi / UMKM", "Vertikal Sosial Media")
     var selectedNewsTemplate by remember { mutableStateOf("Berita Umum") }
     var templateMenu by remember { mutableStateOf(false) }
     var selectedAspectRatio by remember { mutableStateOf("16:9 • YouTube / TV") }
@@ -909,20 +909,49 @@ fun InfoKiniStudio() {
                     }
                 )
             }
-            Text("PILIH TEMPLATE BERITA", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-            Box {
-                OutlinedButton(onClick = { templateMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Template: $selectedNewsTemplate")
-                }
-                DropdownMenu(expanded = templateMenu, onDismissRequest = { templateMenu = false }) {
-                    newsTemplates.forEach { template ->
-                        DropdownMenuItem(text = { Text(template) }, onClick = {
-                            selectedNewsTemplate = template
-                            templateMenu = false
-                        })
+            Text("GALERI TEMPLATE INFOKINI", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text("Pilih desain berita dari galeri. Template aktif digunakan pada proses video.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                newsTemplates.chunked(2).forEach { templateRow ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        templateRow.forEach { template ->
+                            val chosen = selectedNewsTemplate == template
+                            val base = when (template) {
+                                "Breaking News", "Kriminal" -> Color(0xFF781D2B)
+                                "Olahraga" -> Color(0xFF145B3C)
+                                "Info Cuaca" -> Color(0xFF075B83)
+                                "Dokumenter", "Liputan Desa" -> Color(0xFF55452D)
+                                "Wawancara" -> Color(0xFF40346F)
+                                "Ekonomi / UMKM" -> Color(0xFF66501B)
+                                "Vertikal Sosial Media" -> Color(0xFF6A285F)
+                                else -> Navy
+                            }
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                onClick = { selectedNewsTemplate = template },
+                                color = if (chosen) Color(0xFF183A59) else Color(0xFF101936),
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(if (chosen) 2.dp else 1.dp, if (chosen) Cyan else Color(0xFF34415F))
+                            ) {
+                                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    Box(Modifier.fillMaxWidth().height(76.dp).background(base, RoundedCornerShape(7.dp)).padding(7.dp), contentAlignment = Alignment.BottomStart) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                            Text("INFOKINI", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                                            Box(Modifier.fillMaxWidth().height(5.dp).background(Color.White.copy(alpha = 0.85f), RoundedCornerShape(2.dp)))
+                                            Box(Modifier.fillMaxWidth(0.65f).height(5.dp).background(Cyan, RoundedCornerShape(2.dp)))
+                                            Text("infokini.news", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Text(template, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                                    Text(if (chosen) "✓ DIPILIH" else "Gunakan template", color = if (chosen) Cyan else Color(0xFFB8C4D9), fontSize = 9.sp)
+                                }
+                            }
+                        }
+                        if (templateRow.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
+            Text("Template aktif: $selectedNewsTemplate", color = Cyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Text("FORMAT VIDEO", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             Box {
                 OutlinedButton(onClick = { aspectMenu = true }, modifier = Modifier.fillMaxWidth()) {
