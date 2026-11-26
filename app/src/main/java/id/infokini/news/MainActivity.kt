@@ -360,6 +360,115 @@ private fun VideoPage(headline: String, onHeadline: (String) -> Unit, ticker: St
     }
 }
 
+
+@Composable
+private fun VideoExportPage(video: Uri?) {
+    val context = LocalContext.current
+    var durationMs by remember(video) { mutableLongStateOf(0L) }
+    var startMs by remember(video) { mutableFloatStateOf(0f) }
+    var endMs by remember(video) { mutableFloatStateOf(0f) }
+    var status by remember(video) { mutableStateOf("Pilih video dari Editor Video untuk mulai.") }
+    var exporting by remember { mutableStateOf(false) }
+
+    LaunchedEffect(video) {
+        if (video != null) {
+            status = "Membaca durasi video..."
+            val length = withContext(Dispatchers.IO) {
+                runCatching {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, video)
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                    } finally { retriever.release() }
+                }.getOrDefault(0L)
+            }
+            durationMs = length
+            startMs = 0f
+            endMs = length.toFloat()
+            status = if (length > 0L) "Atur titik mulai dan akhir, lalu ekspor." else "Durasi tidak terbaca. Coba pilih file video lain."
+        }
+    }
+
+    fun formatTime(ms: Long): String {
+        val seconds = (ms / 1000L).coerceAtLeast(0L)
+        return "%02d:%02d".format(seconds / 60L, seconds % 60L)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PageHeading("RUANG PRODUKSI / 03", "Potong & Ekspor MP4", "Pilih rentang klip sebelum membuat file video.")
+        CardBlock {
+            Text("SUMBER VIDEO", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(video?.lastPathSegment ?: "Belum ada video dipilih", color = Muted, fontSize = 12.sp)
+            if (durationMs > 0L) {
+                Text("Durasi sumber: " + formatTime(durationMs), color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Titik mulai: " + formatTime(startMs.toLong()), color = Muted, fontSize = 12.sp)
+                Slider(value = startMs, onValueChange = { startMs = it.coerceAtMost(endMs - 1000f) }, valueRange = 0f..(durationMs - 1000L).coerceAtLeast(0L).toFloat())
+                Text("Titik akhir: " + formatTime(endMs.toLong()), color = Muted, fontSize = 12.sp)
+                Slider(value = endMs, onValueChange = { endMs = it.coerceAtLeast(startMs + 1000f) }, valueRange = 1000f..durationMs.toFloat())
+                Text("Durasi hasil: " + formatTime((endMs - startMs).toLong()), color = Accent, fontWeight = FontWeight.Bold)
+            }
+        }
+        CardBlock {
+            Text("EKSPOR VIDEO", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(status, color = if (status.contains("gagal", true) || status.contains("tidak")) Gold else Muted, fontSize = 12.sp)
+            ActionButton(if (exporting) "SEDANG MENGEKSPOR..." else "EKSPOR MP4 KE GALERI", {
+                if (video == null || durationMs <= 0L || endMs <= startMs || exporting) {
+                    status = "Pilih video valid dan atur rentang minimal 1 detik."
+                } else {
+                    exporting = true
+                    status = "Ekspor dimulai. Jangan tutup aplikasi sampai selesai."
+                    val output = File(context.cacheDir, "infokini_" + System.currentTimeMillis() + ".mp4")
+                    val clipping = MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(startMs.toLong())
+                        .setEndPositionMs(endMs.toLong())
+                        .build()
+                    val item = MediaItem.Builder().setUri(video).setClippingConfiguration(clipping).build()
+                    val edited = EditedMediaItem.Builder(item).build()
+                    val listener = object : Transformer.Listener {
+                        override fun onCompleted(composition: androidx.media3.transformer.Composition, exportResult: androidx.media3.transformer.ExportResult) {
+                            try {
+                                val values = ContentValues().apply {
+                                    put(MediaStore.Video.Media.DISPLAY_NAME, "InfoKini_" + System.currentTimeMillis() + ".mp4")
+                                    put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                                    if (Build.VERSION.SDK_INT >= 29) put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/InfoKini")
+                                }
+                                val saved = context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                                    ?: throw IllegalStateException("Tidak dapat membuat file Galeri")
+                                context.contentResolver.openOutputStream(saved)?.use { destination ->
+                                    output.inputStream().use { source -> source.copyTo(destination) }
+                                } ?: throw IllegalStateException("Tidak dapat menyimpan hasil")
+                                output.delete()
+                                status = "Berhasil! MP4 tersimpan di Galeri / Movies / InfoKini."
+                            } catch (error: Exception) {
+                                status = "Ekspor selesai, tetapi penyimpanan ke Galeri gagal: " + error.message
+                            }
+                            exporting = false
+                        }
+                        override fun onError(composition: androidx.media3.transformer.Composition, exportResult: androidx.media3.transformer.ExportResult, exception: androidx.media3.transformer.ExportException) {
+                            output.delete()
+                            status = "Ekspor gagal: " + (exception.message ?: "format video tidak didukung")
+                            exporting = false
+                        }
+                    }
+                    try {
+                        Transformer.Builder(context)
+                            .setVideoMimeType(MimeTypes.VIDEO_H264)
+                            .setAudioMimeType(MimeTypes.AUDIO_AAC)
+                            .addListener(listener)
+                            .build()
+                            .start(edited, output.absolutePath)
+                    } catch (error: Exception) {
+                        output.delete()
+                        status = "Tidak dapat memulai ekspor: " + error.message
+                        exporting = false
+                    }
+                }
+            }, true)
+        }
+        Text("Versi ini mendukung pemotongan satu video dan ekspor MP4. Penggabungan banyak klip, transisi, overlay ticker permanen, dan mixing musik masih tahap pengembangan.", color = Gold, fontSize = 11.sp)
+    }
+}
+
 @Composable
 private fun PhotoPage(
     photo: Uri?,
