@@ -18,6 +18,12 @@ import android.net.Uri
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.widget.VideoView
+import android.media.MediaMetadataRetriever
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.Transformer
+import java.io.File
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.view.Gravity
