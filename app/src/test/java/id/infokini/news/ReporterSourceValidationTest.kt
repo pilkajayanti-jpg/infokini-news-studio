@@ -18,6 +18,12 @@ class ReporterSourceValidationTest {
         assertFalse(isValidHttpUrl("not a url"))
     }
 
+    @Test fun sanitizesExportFileNames() {
+        assertTrue(safeExportFileName("Liputan Ciadeg 2026").matches(Regex("[A-Za-z0-9._-]+")))
+        assertTrue(safeExportFileName("   ").isNotBlank())
+        assertFalse(safeExportFileName("Liputan /:*?\"<>|").contains("/"))
+    }
+
     @Test fun requiresDifferentNormalizedHosts() {
         assertTrue(isValidIndependentSourcePair("https://news.example.com/a", "https://other.org/b"))
         assertFalse(isValidIndependentSourcePair("https://example.com/a", "https://www.example.com/b"))
