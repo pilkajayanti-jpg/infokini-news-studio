@@ -192,6 +192,7 @@ fun InfoKiniStudio() {
     var selectedMusicTheme by remember { mutableStateOf(audioPreferences.getString("music_theme", "InfoKini News Theme") ?: "InfoKini News Theme") }
     var musicVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("music_volume", 0.25f)) }
     var originalAudioVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("original_audio_volume", 1f)) }
+    var narrationVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("narration_volume", 1f)) }
     var musicThemeMenu by remember { mutableStateOf(false) }
     var photoBrightness by remember { mutableFloatStateOf(0f) }
     var photoContrast by remember { mutableFloatStateOf(1f) }
@@ -407,7 +408,9 @@ fun InfoKiniStudio() {
                     }
                     val currentNarrationScript = listOf(headline.trim(), ticker.trim(), videoCaption.trim()).filter { it.isNotBlank() }.joinToString(". ")
                     narrationAudioFile?.takeIf { it.exists() && it.length() > 0L && narrationAudioScript == currentNarrationScript }?.let { narrationFile ->
-                        val narrationItem = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narrationFile))).build()
+                        val narrationGain = GainProcessor(DefaultGainProvider.Builder(narrationVolume.coerceIn(0f, 1f)).build())
+                        val narrationEffects = Effects(listOf(narrationGain), emptyList())
+                        val narrationItem = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narrationFile))).setEffects(narrationEffects).build()
                         compositionSequences.add(EditedMediaItemSequence.withAudioFrom(listOf(narrationItem)))
                     }
                     val composition = Composition.Builder(compositionSequences).build()
@@ -1360,6 +1363,10 @@ fun InfoKiniStudio() {
                 Text("PILIH FILE MUSIK (MP3 / AUDIO)")
             }
             Text(backgroundMusicLabel, color = Color.LightGray, fontSize = 11.sp)
+            if (narrationAudioFile?.exists() == true) {
+                Text("Volume suara narator: ${(narrationVolume * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
+                Slider(value = narrationVolume, onValueChange = { narrationVolume = it }, valueRange = 0f..1f, onValueChangeFinished = { audioPreferences.edit().putFloat("narration_volume", narrationVolume).apply() })
+            }
             Text("Volume audio asli video: ${(originalAudioVolume * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
             Slider(value = originalAudioVolume, onValueChange = { originalAudioVolume = it }, valueRange = 0f..1f, onValueChangeFinished = { audioPreferences.edit().putFloat("original_audio_volume", originalAudioVolume).apply() })
             if (backgroundMusicUri != null) {
