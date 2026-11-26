@@ -3,6 +3,12 @@ package id.infokini.news
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.RectF
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import android.widget.ImageView
@@ -66,6 +72,64 @@ fun InfoKiniStudio() {
         if (uri != null) {
             selectedMedia = uri
             mediaLabel = uri.lastPathSegment ?: "Media dipilih"
+        }
+    }
+    val posterExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { outputUri ->
+        if (outputUri != null) {
+            val sourceUri = selectedMedia
+            if (sourceUri == null || context.contentResolver.getType(sourceUri)?.startsWith("image/") != true) {
+                Toast.makeText(context, "Pilih foto terlebih dahulu untuk membuat poster", Toast.LENGTH_LONG).show()
+            } else {
+                try {
+                    val source = context.contentResolver.openInputStream(sourceUri)?.use { BitmapFactory.decodeStream(it) }
+                        ?: throw IllegalStateException("Foto tidak dapat dibaca")
+                    val poster = Bitmap.createBitmap(1080, 1920, Bitmap.Config.ARGB_8888)
+                    val canvas = Canvas(poster)
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                    val scale = maxOf(1080f / source.width, 1920f / source.height)
+                    val drawWidth = source.width * scale
+                    val drawHeight = source.height * scale
+                    val imageRect = RectF((1080f - drawWidth) / 2f, (1920f - drawHeight) / 2f, (1080f + drawWidth) / 2f, (1920f + drawHeight) / 2f)
+                    canvas.drawBitmap(source, null, imageRect, paint)
+                    paint.color = android.graphics.Color.argb(225, 8, 13, 74)
+                    canvas.drawRect(0f, 1320f, 1080f, 1920f, paint)
+                    paint.color = android.graphics.Color.rgb(19, 189, 235)
+                    paint.typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                    paint.textSize = 48f
+                    canvas.drawText("INFO KINI  •  infokini.news", 58f, 1400f, paint)
+                    paint.color = android.graphics.Color.WHITE
+                    paint.textSize = 58f
+                    paint.typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                    val words = headline.ifBlank { "INFO TERKINI" }.split(" ")
+                    var line = ""
+                    var y = 1500f
+                    for (word in words) {
+                        val candidate = if (line.isEmpty()) word else "$line $word"
+                        if (paint.measureText(candidate) > 960f && line.isNotEmpty()) {
+                            canvas.drawText(line, 58f, y, paint)
+                            y += 72f
+                            line = word
+                        } else line = candidate
+                    }
+                    if (line.isNotEmpty() && y < 1705f) canvas.drawText(line, 58f, y, paint)
+                    paint.color = android.graphics.Color.rgb(19, 189, 235)
+                    paint.textSize = 34f
+                    paint.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    canvas.drawText(location.ifBlank { "Berita terkini" }, 58f, 1770f, paint)
+                    paint.color = android.graphics.Color.WHITE
+                    paint.textSize = 30f
+                    canvas.drawText(ticker.take(62), 58f, 1830f, paint)
+                    paint.textSize = 26f
+                    canvas.drawText("Reporter: Wandi Azis", 58f, 1880f, paint)
+                    context.contentResolver.openOutputStream(outputUri)?.use { poster.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                        ?: throw IllegalStateException("File tujuan tidak dapat dibuka")
+                    source.recycle()
+                    poster.recycle()
+                    Toast.makeText(context, "Poster InfoKini berhasil diekspor", Toast.LENGTH_LONG).show()
+                } catch (error: Exception) {
+                    Toast.makeText(context, "Ekspor gagal: ${error.message ?: "kesalahan file"}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -169,6 +233,14 @@ fun InfoKiniStudio() {
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
             ) { Text("PILIH FOTO / VIDEO DARI HP") }
             Text(mediaLabel, color = Color.LightGray, fontSize = 12.sp)
+            if (selectedMedia != null && context.contentResolver.getType(selectedMedia!!)?.startsWith("image/") == true) {
+                Button(
+                    onClick = { posterExporter.launch("InfoKini-Poster.png") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
+                ) { Text("EKSPOR POSTER BERITA PNG", fontWeight = FontWeight.Black) }
+                Text("Membuat poster vertikal 1080 × 1920 dengan identitas InfoKini, judul, lokasi, running text, dan kredit reporter.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            }
             if (selectedMedia != null) {
                 val isVideo = context.contentResolver.getType(selectedMedia!!)?.startsWith("video/") == true
                 Text(if (isVideo) "PRATINJAU VIDEO" else "PRATINJAU FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
