@@ -242,6 +242,7 @@ fun InfoKiniStudio() {
             videoDurationMs = duration
             videoStartMs = 0f
             videoEndMs = duration.toFloat()
+            previewSeekMs = 0f
         } else {
             videoDurationMs = 0L
             videoStartMs = 0f
@@ -269,6 +270,8 @@ fun InfoKiniStudio() {
     var videoDurationMs by remember { mutableLongStateOf(0L) }
     var videoStartMs by remember { mutableFloatStateOf(0f) }
     var videoEndMs by remember { mutableFloatStateOf(0f) }
+    var previewSeekMs by remember { mutableFloatStateOf(0f) }
+    var previewVideoView by remember { mutableStateOf<VideoView?>(null) }
     var videoExporting by remember { mutableStateOf(false) }
     var pendingVideoOutput by remember { mutableStateOf<Uri?>(null) }
     var live by remember { mutableStateOf(false) }
@@ -1634,19 +1637,47 @@ fun InfoKiniStudio() {
                     AndroidView(
                         factory = { viewContext ->
                             VideoView(viewContext).apply {
+                                previewVideoView = this
                                 setVideoURI(selectedMedia)
-                                setOnPreparedListener { player -> player.isLooping = true; start() }
+                                setOnPreparedListener { player ->
+                                    player.isLooping = true
+                                    seekTo(previewSeekMs.toInt())
+                                    start()
+                                }
                             }
                         },
                         update = { view ->
+                            previewVideoView = view
                             if (view.tag != selectedMedia.toString()) {
                                 view.tag = selectedMedia.toString()
                                 view.setVideoURI(selectedMedia)
-                                view.setOnPreparedListener { player -> player.isLooping = true; view.start() }
+                                view.setOnPreparedListener { player ->
+                                    player.isLooping = true
+                                    view.seekTo(previewSeekMs.toInt())
+                                    view.start()
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(220.dp)
                     )
+                    if (videoDurationMs > 1000L) {
+                        Text("POSISI PRATINJAU: " + (previewSeekMs / 1000f).toInt() + " detik", color = Color.White, fontSize = 11.sp)
+                        Slider(
+                            value = previewSeekMs.coerceIn(0f, videoDurationMs.toFloat()),
+                            onValueChange = { position ->
+                                previewSeekMs = position
+                                previewVideoView?.seekTo(position.toInt())
+                            },
+                            valueRange = 0f..videoDurationMs.toFloat()
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                previewSeekMs = videoStartMs
+                                previewVideoView?.seekTo(videoStartMs.toInt())
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("KEMBALI KE TITIK AWAL POTONGAN") }
+                    }
                 } else {
                     Box(
                         Modifier.fillMaxWidth().height(220.dp).background(Color.Black),
