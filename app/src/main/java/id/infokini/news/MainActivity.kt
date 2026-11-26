@@ -590,7 +590,7 @@ fun InfoKiniStudio() {
                 FilterChip(selected = footballMode, onClick = { footballMode = true; sportsNewsMode = false }, label = { Text("Skor Bola") })
                 FilterChip(selected = sportsNewsMode, onClick = { sportsNewsMode = true; footballMode = false }, label = { Text("Berita Olahraga") })
             }
-            Text("MENU FITUR • VERSI 2.4", color = Color(0xFFB8C4D9), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("MENU FITUR • VERSI 2.5", color = Color(0xFFB8C4D9), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("VIDEO", fontSize = 10.sp) }
                 OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(reporterSectionY.coerceAtLeast(0)) } }, modifier = Modifier.weight(1f)) { Text("AI REPORTER", fontSize = 10.sp) }
@@ -1518,7 +1518,7 @@ private suspend fun fetchGoogleNewsRss(query: String): List<ReporterRssItem> = w
     val connection = feedUrl.openConnection().apply {
         connectTimeout = 12000
         readTimeout = 12000
-        setRequestProperty("User-Agent", "InfoKiniStudio/2.3 (Android)")
+        setRequestProperty("User-Agent", "InfoKiniStudio/2.5 (Android)")
     }
     connection.getInputStream().use { stream ->
         val parser = Xml.newPullParser()
