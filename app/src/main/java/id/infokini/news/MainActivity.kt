@@ -1115,7 +1115,7 @@ fun InfoKiniStudio() {
                 Text(if (isVideo) "PRATINJAU VIDEO" else "PRATINJAU FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 if (isVideo) {
                     Text("EDITOR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    if (videoDurationMs > 0L) {
+                    if (videoDurationMs >= 1000L) {
                         Text("Durasi: ${videoDurationMs / 1000}s", color = Color.White, fontSize = 12.sp)
                         Text("Mulai: ${(videoStartMs / 1000f).toInt()} detik", color = Color.White, fontSize = 12.sp)
                         Slider(
@@ -1134,7 +1134,7 @@ fun InfoKiniStudio() {
                                 if (reporterMaterialAppliedToVideo && !reporterApproved) {
                                     Toast.makeText(context, "Video dari AI Reporter belum dapat diekspor. Lengkapi verifikasi dan persetujuan redaksi terlebih dahulu.", Toast.LENGTH_LONG).show()
                                 } else {
-                                    videoExporter.launch("InfoKini-Video-Edit.mp4")
+                                    videoExporter.launch("${safeExportFileName(projectName)}.mp4")
                                 }
                             },
                             enabled = !videoExporting,
@@ -1287,6 +1287,16 @@ fun InfoKiniStudio() {
     }
 }
 
+
+internal fun safeExportFileName(value: String): String {
+    val normalized = value.trim()
+        .replace(Regex("[^A-Za-z0-9._ -]"), "")
+        .replace(Regex("\\s+"), "-")
+        .replace(Regex("-{2,}"), "-")
+        .trim('-', '.', ' ')
+        .take(48)
+    return normalized.ifBlank { "InfoKini-Video-Edit" }
+}
 
 internal fun isValidHttpUrl(value: String): Boolean {
     return try {
