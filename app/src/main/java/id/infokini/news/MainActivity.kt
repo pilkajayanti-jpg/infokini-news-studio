@@ -245,8 +245,12 @@ fun InfoKiniStudio() {
                 canvas.drawText("$matchTime  •  $matchStatus", 300f, 430f, paint)
                 paint.color = android.graphics.Color.WHITE
                 paint.textSize = 24f
-                canvas.drawText("KUNING $homeYellowCards  MERAH $homeRedCards", 55f, 500f, paint)
-                canvas.drawText("KUNING $awayYellowCards  MERAH $awayRedCards", 600f, 500f, paint)
+                canvas.drawText("KUNING $homeYellowCards  MERAH $homeRedCards", 55f, 488f, paint)
+                canvas.drawText("KUNING $awayYellowCards  MERAH $awayRedCards", 600f, 488f, paint)
+                paint.color = android.graphics.Color.rgb(19, 189, 235)
+                paint.textSize = 22f
+                val eventLine = matchEvents.ifBlank { ticker }.take(78)
+                if (eventLine.isNotBlank()) canvas.drawText(eventLine, 55f, 535f, paint)
                 context.contentResolver.openOutputStream(outputUri)?.use {
                     if (!graphic.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IllegalStateException("PNG gagal disimpan")
                 } ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka")
