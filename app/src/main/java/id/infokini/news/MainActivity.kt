@@ -579,7 +579,7 @@ fun InfoKiniStudio() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("VIDEO", fontSize = 10.sp) }
                 OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(reporterSectionY.coerceAtLeast(0)) } }, modifier = Modifier.weight(1f)) { Text("AI REPORTER", fontSize = 10.sp) }
-                OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(photoSectionY.coerceAtLeast(0)) } }, modifier = Modifier.weight(1f)) { Text("FOTO", fontSize = 10.sp) }
+                OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; picker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) { Text("FOTO", fontSize = 10.sp) }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(onClick = { sportsNewsMode = true; footballMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("BERITA OLAHRAGA", fontSize = 10.sp) }
