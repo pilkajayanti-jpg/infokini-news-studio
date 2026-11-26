@@ -178,22 +178,50 @@ fun InfoKiniStudio() {
             .putString("video_script", reporterVideoScript)
             .apply()
     }
-    var headline by remember { mutableStateOf("") }
-    var ticker by remember { mutableStateOf("") }
-    var videoCaption by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
+    val videoEditorPrefs = remember { context.getSharedPreferences("infokini_video_editor", 0) }
+    var headline by remember { mutableStateOf(videoEditorPrefs.getString("headline", "").orEmpty()) }
+    var ticker by remember { mutableStateOf(videoEditorPrefs.getString("ticker", "").orEmpty()) }
+    var videoCaption by remember { mutableStateOf(videoEditorPrefs.getString("caption", "").orEmpty()) }
+    var location by remember { mutableStateOf(videoEditorPrefs.getString("location", "").orEmpty()) }
     var projectName by remember { mutableStateOf("Proyek berita baru") }
     var savedProjectNames by remember { mutableStateOf(context.getSharedPreferences("infokini_video_projects", 0).getStringSet("project_names", emptySet())?.toList()?.sorted().orEmpty()) }
     var projectMenuExpanded by remember { mutableStateOf(false) }
     var projectPendingDelete by remember { mutableStateOf<String?>(null) }
     val newsTemplates = listOf("Breaking News", "Berita Umum", "Liputan Desa", "Wawancara", "Olahraga", "Info Cuaca", "Dokumenter", "Kriminal", "Ekonomi / UMKM", "Vertikal Sosial Media")
-    var selectedNewsTemplate by remember { mutableStateOf("Berita Umum") }
+    var selectedNewsTemplate by remember { mutableStateOf(videoEditorPrefs.getString("template", "Berita Umum") ?: "Berita Umum") }
     var templateMenu by remember { mutableStateOf(false) }
-    var selectedAspectRatio by remember { mutableStateOf("16:9 • YouTube / TV") }
+    var selectedAspectRatio by remember { mutableStateOf(videoEditorPrefs.getString("aspect_ratio", "16:9 • YouTube / TV") ?: "16:9 • YouTube / TV") }
     var aspectMenu by remember { mutableStateOf(false) }
-    var selectedMedia by remember { mutableStateOf<Uri?>(null) }
-    var additionalVideoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
-    var clipTrimPercentages by remember { mutableStateOf<Map<String, Pair<Float, Float>>>(emptyMap()) }
+    var selectedMedia by remember { mutableStateOf(videoEditorPrefs.getString("primary_video", null)?.let { runCatching { Uri.parse(it) }.getOrNull() }) }
+    var additionalVideoUris by remember { mutableStateOf(videoEditorPrefs.getString("additional_videos", "").orEmpty().split("\n").filter { it.startsWith("content://") }.mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }) }
+    var clipTrimPercentages by remember { mutableStateOf<Map<String, Pair<Float, Float>>>(run {
+        val saved = runCatching { JSONObject(videoEditorPrefs.getString("clip_trims", "{}").orEmpty()) }.getOrNull()
+        val restored = mutableMapOf<String, Pair<Float, Float>>()
+        if (saved != null) {
+            val keys = saved.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val range = saved.optJSONArray(key)
+                if (range != null && range.length() >= 2) restored[key] = range.optDouble(0, 0.0).toFloat() to range.optDouble(1, 100.0).toFloat()
+            }
+        }
+        restored
+    }) }
+    LaunchedEffect(headline, ticker, videoCaption, location, selectedNewsTemplate, selectedAspectRatio, selectedMedia, additionalVideoUris, clipTrimPercentages) {
+        val trims = JSONObject()
+        clipTrimPercentages.forEach { (key, range) -> trims.put(key, org.json.JSONArray().put(range.first).put(range.second)) }
+        videoEditorPrefs.edit()
+            .putString("headline", headline)
+            .putString("ticker", ticker)
+            .putString("caption", videoCaption)
+            .putString("location", location)
+            .putString("template", selectedNewsTemplate)
+            .putString("aspect_ratio", selectedAspectRatio)
+            .putString("primary_video", selectedMedia?.toString())
+            .putString("additional_videos", additionalVideoUris.joinToString("\n") { it.toString() })
+            .putString("clip_trims", trims.toString())
+            .apply()
+    }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
     val audioPreferences = remember { context.getSharedPreferences("infokini_audio", 0) }
     var backgroundMusicUri by remember { mutableStateOf(audioPreferences.getString("music_uri", null)?.let { Uri.parse(it) }) }
