@@ -9,6 +9,8 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.RectF
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import android.widget.ImageView
@@ -58,6 +60,9 @@ fun InfoKiniStudio() {
     var location by remember { mutableStateOf("") }
     var selectedMedia by remember { mutableStateOf<Uri?>(null) }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
+    var photoBrightness by remember { mutableFloatStateOf(0f) }
+    var photoContrast by remember { mutableFloatStateOf(1f) }
+    var photoSaturation by remember { mutableFloatStateOf(1f) }
     var live by remember { mutableStateOf(false) }
     var footballMode by remember { mutableStateOf(false) }
     var sportsNewsMode by remember { mutableStateOf(false) }
@@ -131,6 +136,37 @@ fun InfoKiniStudio() {
         }
     }
 
+
+    val photoExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { outputUri ->
+        if (outputUri != null) {
+            val sourceUri = selectedMedia
+            if (sourceUri == null || context.contentResolver.getType(sourceUri)?.startsWith("image/") != true) {
+                Toast.makeText(context, "Pilih foto terlebih dahulu", Toast.LENGTH_LONG).show()
+            } else {
+                try {
+                    val source = context.contentResolver.openInputStream(sourceUri)?.use { BitmapFactory.decodeStream(it) }
+                        ?: throw IllegalStateException("Foto tidak dapat dibaca")
+                    val edited = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                        colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
+                    }
+                    Canvas(edited).drawBitmap(source, 0f, 0f, paint)
+                    val stream = context.contentResolver.openOutputStream(outputUri)
+                        ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka")
+                    stream.use {
+                        if (!edited.compress(Bitmap.CompressFormat.JPEG, 92, it)) {
+                            throw IllegalStateException("Foto gagal disimpan")
+                        }
+                    }
+                    source.recycle()
+                    edited.recycle()
+                    Toast.makeText(context, "Foto hasil edit berhasil disimpan", Toast.LENGTH_LONG).show()
+                } catch (error: Exception) {
+                    Toast.makeText(context, "Edit foto gagal: ${error.message ?: "kesalahan file"}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
     MaterialTheme(colorScheme = darkColorScheme(
         primary = Cyan, secondary = Cyan, background = Color(0xFF080D4A),
         surface = Color(0xFF111A35), onSurface = Color.White
@@ -231,6 +267,26 @@ fun InfoKiniStudio() {
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
             ) { Text("PILIH FOTO / VIDEO DARI HP") }
             Text(mediaLabel, color = Color.LightGray, fontSize = 12.sp)
+
+            if (selectedMedia != null && context.contentResolver.getType(selectedMedia!!)?.startsWith("image/") == true) {
+                Text("EDITOR FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Kecerahan: ${photoBrightness.toInt()}", color = Color.White, fontSize = 12.sp)
+                Slider(value = photoBrightness, onValueChange = { photoBrightness = it }, valueRange = -100f..100f)
+                Text("Kontras: ${"%.1f".format(Locale.US, photoContrast)}", color = Color.White, fontSize = 12.sp)
+                Slider(value = photoContrast, onValueChange = { photoContrast = it }, valueRange = 0.5f..1.8f)
+                Text("Saturasi: ${"%.1f".format(Locale.US, photoSaturation)}", color = Color.White, fontSize = 12.sp)
+                Slider(value = photoSaturation, onValueChange = { photoSaturation = it }, valueRange = 0f..2f)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        photoBrightness = 0f
+                        photoContrast = 1f
+                        photoSaturation = 1f
+                    }, modifier = Modifier.weight(1f)) { Text("Atur ulang") }
+                    Button(onClick = { photoExporter.launch("InfoKini-Foto-Edit.jpg") }, modifier = Modifier.weight(1f)) {
+                        Text("SIMPAN FOTO EDIT")
+                    }
+                }
+            }
             if (selectedMedia != null && context.contentResolver.getType(selectedMedia!!)?.startsWith("image/") == true) {
                 Button(
                     onClick = { posterExporter.launch("InfoKini-Poster.png") },
@@ -266,9 +322,13 @@ fun InfoKiniStudio() {
                                 scaleType = ImageView.ScaleType.FIT_CENTER
                                 setBackgroundColor(android.graphics.Color.BLACK)
                                 setImageURI(selectedMedia)
+                                colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
                             }
                         },
-                        update = { view -> view.setImageURI(selectedMedia) },
+                        update = { view ->
+                            view.setImageURI(selectedMedia)
+                            view.colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
+                        },
                         modifier = Modifier.fillMaxWidth().height(220.dp)
                     )
                 }
@@ -316,6 +376,20 @@ fun InfoKiniStudio() {
             Text("Mode skor sepak bola masih tahap dasar. Logo tim/kompetisi, jam pertandingan otomatis, statistik laga, dan ekspor grafis video memerlukan pengembangan lanjutan. Ekspor MP4, editor video penuh, AI redaktur, TTS, dan siaran langsung juga belum selesai.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
         }
     }
+}
+
+
+private fun createPhotoColorMatrix(brightness: Float, contrast: Float, saturation: Float): ColorMatrix {
+    val inverse = 1f - saturation
+    val red = 0.213f * inverse
+    val green = 0.715f * inverse
+    val blue = 0.072f * inverse
+    return ColorMatrix(floatArrayOf(
+        (red + saturation) * contrast, green * contrast, blue * contrast, 0f, brightness,
+        red * contrast, (green + saturation) * contrast, blue * contrast, 0f, brightness,
+        red * contrast, green * contrast, (blue + saturation) * contrast, 0f, brightness,
+        0f, 0f, 0f, 1f, 0f
+    ))
 }
 
 @Composable
