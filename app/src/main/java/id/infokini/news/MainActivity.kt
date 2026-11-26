@@ -469,14 +469,22 @@ fun InfoKiniStudio() {
                 try {
                     val source = context.contentResolver.openInputStream(sourceUri)?.use { BitmapFactory.decodeStream(it) }
                         ?: throw IllegalStateException("Foto tidak dapat dibaca")
+                    val transform = Matrix().apply {
+                        postScale(if (photoFlipHorizontal) -1f else 1f, if (photoFlipVertical) -1f else 1f)
+                        postRotate(photoRotation)
+                    }
+                    val posterSource = Bitmap.createBitmap(source, 0, 0, source.width, source.height, transform, true)
                     val poster = Bitmap.createBitmap(1080, 1920, Bitmap.Config.ARGB_8888)
                     val canvas = Canvas(poster)
-                    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-                    val scale = maxOf(1080f / source.width, 1920f / source.height)
-                    val drawWidth = source.width * scale
-                    val drawHeight = source.height * scale
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                        colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
+                    }
+                    val scale = maxOf(1080f / posterSource.width, 1920f / posterSource.height)
+                    val drawWidth = posterSource.width * scale
+                    val drawHeight = posterSource.height * scale
                     val imageRect = RectF((1080f - drawWidth) / 2f, (1920f - drawHeight) / 2f, (1080f + drawWidth) / 2f, (1920f + drawHeight) / 2f)
-                    canvas.drawBitmap(source, null, imageRect, paint)
+                    canvas.drawBitmap(posterSource, null, imageRect, paint)
+                    paint.colorFilter = null
                     paint.color = android.graphics.Color.argb(225, 8, 13, 74)
                     canvas.drawRect(0f, 1320f, 1080f, 1920f, paint)
                     paint.color = android.graphics.Color.rgb(19, 189, 235)
@@ -507,9 +515,10 @@ fun InfoKiniStudio() {
                     canvas.drawText(ticker.take(62), 58f, 1830f, paint)
                     context.contentResolver.openOutputStream(outputUri)?.use { poster.compress(Bitmap.CompressFormat.PNG, 100, it) }
                         ?: throw IllegalStateException("File tujuan tidak dapat dibuka")
-                    source.recycle()
+                    if (posterSource !== source && !source.isRecycled) source.recycle()
+                    if (!posterSource.isRecycled) posterSource.recycle()
                     poster.recycle()
-                    Toast.makeText(context, "Poster InfoKini berhasil diekspor", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Poster InfoKini berhasil diekspor dengan pengaturan edit foto", Toast.LENGTH_LONG).show()
                 } catch (error: Exception) {
                     Toast.makeText(context, "Ekspor gagal: ${error.message ?: "kesalahan file"}", Toast.LENGTH_LONG).show()
                 }
