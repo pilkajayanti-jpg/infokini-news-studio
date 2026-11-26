@@ -399,3 +399,35 @@ private suspend fun getNewsHeadlines(query: String): List<String> = withContext(
         }
     } finally { (connection as? java.net.HttpURLConnection)?.disconnect() }
 }
+
+
+internal fun isValidHttpUrl(value: String): Boolean {
+    if (value.isBlank()) return false
+    return try {
+        val parsed = java.net.URI(value.trim()).toURL()
+        (parsed.protocol.equals("http", true) || parsed.protocol.equals("https", true)) &&
+            !parsed.host.isNullOrBlank()
+    } catch (_: Exception) {
+        false
+    }
+}
+
+internal fun safeExportFileName(value: String): String {
+    val cleaned = value.trim()
+        .replace(Regex("[^A-Za-z0-9._-]+"), "_")
+        .trim('_', '.', '-')
+    return cleaned.ifBlank { "infokini_news" }.take(80)
+}
+
+internal fun isValidIndependentSourcePair(first: String, second: String): Boolean {
+    if (!isValidHttpUrl(first) || !isValidHttpUrl(second)) return false
+    return try {
+        fun host(value: String): String =
+            java.net.URI(value.trim()).host.orEmpty().lowercase(Locale.ROOT).removePrefix("www.")
+        val a = host(first)
+        val b = host(second)
+        a.isNotBlank() && b.isNotBlank() && a != b
+    } catch (_: Exception) {
+        false
+    }
+}
