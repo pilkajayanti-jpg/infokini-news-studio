@@ -1,0 +1,3 @@
+name = "infokini-ai-backend"
+main = "worker.js"
+compatibility_date = "2026-11-26"
