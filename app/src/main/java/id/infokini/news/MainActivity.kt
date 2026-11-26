@@ -34,6 +34,9 @@ import androidx.media3.transformer.Effects
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
+import androidx.media3.effect.Brightness
+import androidx.media3.effect.Contrast
+import androidx.media3.effect.HslAdjustment
 import androidx.media3.effect.TextOverlay
 import androidx.media3.effect.TextureOverlay
 import android.text.SpannableString
@@ -207,7 +210,7 @@ fun InfoKiniStudio() {
         }
         restored
     }) }
-    LaunchedEffect(headline, ticker, videoCaption, location, selectedNewsTemplate, selectedAspectRatio, selectedMedia, additionalVideoUris, clipTrimPercentages) {
+    LaunchedEffect(headline, ticker, videoCaption, location, selectedNewsTemplate, selectedAspectRatio, selectedMedia, additionalVideoUris, clipTrimPercentages, videoBrightness, videoContrast, videoSaturation) {
         val trims = JSONObject()
         clipTrimPercentages.forEach { (key, range) -> trims.put(key, org.json.JSONArray().put(range.first).put(range.second)) }
         videoEditorPrefs.edit()
@@ -220,6 +223,9 @@ fun InfoKiniStudio() {
             .putString("primary_video", selectedMedia?.toString())
             .putString("additional_videos", additionalVideoUris.joinToString("\n") { it.toString() })
             .putString("clip_trims", trims.toString())
+            .putFloat("video_brightness", videoBrightness)
+            .putFloat("video_contrast", videoContrast)
+            .putFloat("video_saturation", videoSaturation)
             .apply()
     }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
@@ -244,6 +250,9 @@ fun InfoKiniStudio() {
     var videoStartMs by remember { mutableFloatStateOf(0f) }
     var videoEndMs by remember { mutableFloatStateOf(0f) }
     var previewSeekMs by remember { mutableFloatStateOf(0f) }
+    var videoBrightness by remember { mutableFloatStateOf(videoEditorPrefs.getFloat("video_brightness", 0f)) }
+    var videoContrast by remember { mutableFloatStateOf(videoEditorPrefs.getFloat("video_contrast", 0f)) }
+    var videoSaturation by remember { mutableFloatStateOf(videoEditorPrefs.getFloat("video_saturation", 0f)) }
     var previewVideoView by remember { mutableStateOf<VideoView?>(null) }
     LaunchedEffect(selectedMedia) {
         val mediaUri = selectedMedia
@@ -433,6 +442,9 @@ fun InfoKiniStudio() {
                         Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
                     )
                     val videoEffects = mutableListOf<androidx.media3.common.Effect>(aspectPresentation)
+                    if (videoBrightness != 0f) videoEffects.add(Brightness(videoBrightness.coerceIn(-1f, 1f)))
+                    if (videoContrast != 0f) videoEffects.add(Contrast(videoContrast.coerceIn(-1f, 1f)))
+                    if (videoSaturation != 0f) videoEffects.add(HslAdjustment.Builder().adjustSaturation(videoSaturation.coerceIn(-100f, 100f)).build())
                     if (videoOverlays.isNotEmpty()) {
                         videoEffects.add(OverlayEffect(videoOverlays))
                     }
@@ -1618,6 +1630,14 @@ fun InfoKiniStudio() {
                                 Text("KOSONGKAN KLIP TAMBAHAN")
                             }
                         }
+                        Text("EFEK VIDEO • Pengaturan diterapkan ke seluruh klip saat ekspor", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Kecerahan: ${(videoBrightness * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
+                        Slider(value = videoBrightness, onValueChange = { videoBrightness = it }, valueRange = -1f..1f)
+                        Text("Kontras: ${(videoContrast * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
+                        Slider(value = videoContrast, onValueChange = { videoContrast = it }, valueRange = -1f..1f)
+                        Text("Saturasi: ${videoSaturation.toInt()}", color = Color.White, fontSize = 11.sp)
+                        Slider(value = videoSaturation, onValueChange = { videoSaturation = it }, valueRange = -100f..100f)
+                        OutlinedButton(onClick = { videoBrightness = 0f; videoContrast = 0f; videoSaturation = 0f }, modifier = Modifier.fillMaxWidth()) { Text("RESET EFEK VIDEO") }
                         Button(
                             onClick = {
                                 if (reporterMaterialAppliedToVideo && !reporterApproved) {
