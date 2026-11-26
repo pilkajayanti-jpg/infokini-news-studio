@@ -1724,10 +1724,17 @@ fun InfoKiniStudio() {
                             override fun onStart(utteranceId: String?) {}
                             override fun onDone(utteranceId: String?) {
                                 Handler(Looper.getMainLooper()).post {
-                                    narrationAudioFile = narrationFile
-                                    narrationAudioScript = script
                                     narrationGenerating = false
-                                    Toast.makeText(context, "Audio narator siap dan akan disertakan saat ekspor MP4", Toast.LENGTH_LONG).show()
+                                    if (narrationFile.exists() && narrationFile.length() > 44L) {
+                                        narrationAudioFile = narrationFile
+                                        narrationAudioScript = script
+                                        Toast.makeText(context, "Audio narator siap dan akan disertakan saat ekspor MP4", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        narrationFile.delete()
+                                        narrationAudioFile = null
+                                        narrationAudioScript = ""
+                                        Toast.makeText(context, "File audio narator tidak terbentuk dengan benar. Coba lagi atau periksa mesin TTS HP.", Toast.LENGTH_LONG).show()
+                                    }
                                 }
                             }
                             override fun onError(utteranceId: String?) {
