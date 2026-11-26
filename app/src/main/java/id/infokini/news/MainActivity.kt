@@ -119,8 +119,6 @@ fun InfoKiniStudio() {
                     paint.color = android.graphics.Color.WHITE
                     paint.textSize = 30f
                     canvas.drawText(ticker.take(62), 58f, 1830f, paint)
-                    paint.textSize = 26f
-                    canvas.drawText("Reporter: Wandi Azis", 58f, 1880f, paint)
                     context.contentResolver.openOutputStream(outputUri)?.use { poster.compress(Bitmap.CompressFormat.PNG, 100, it) }
                         ?: throw IllegalStateException("File tujuan tidak dapat dibuka")
                     source.recycle()
@@ -239,7 +237,7 @@ fun InfoKiniStudio() {
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
                 ) { Text("EKSPOR POSTER BERITA PNG", fontWeight = FontWeight.Black) }
-                Text("Membuat poster vertikal 1080 × 1920 dengan identitas InfoKini, judul, lokasi, running text, dan kredit reporter.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+                Text("Membuat poster vertikal 1080 × 1920 dengan identitas InfoKini, judul, lokasi, dan running text.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             }
             if (selectedMedia != null) {
                 val isVideo = context.contentResolver.getType(selectedMedia!!)?.startsWith("video/") == true
@@ -293,7 +291,7 @@ fun InfoKiniStudio() {
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
-                        val shareText = "INFO KINI | infokini.news\n" + headline + "\n" + location + "\n\n" + ticker + "\n\nReporter: Wandi Azis"
+                        val shareText = "INFO KINI | infokini.news\n" + headline + "\n" + location + "\n\n" + ticker
                         val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareText) }
                         context.startActivity(Intent.createChooser(send, "Bagikan konten InfoKini"))
                     }, modifier = Modifier.weight(1f)) { Text("Bagikan") }
@@ -312,6 +310,8 @@ fun InfoKiniStudio() {
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
             ) { Text("PERBARUI PRATINJAU", fontWeight = FontWeight.Black) }
+
+            Text("Tentang aplikasi: InfoKini News Studio. Penggagas: Wandi Azis.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
 
             Text("Mode skor sepak bola masih tahap dasar. Logo tim/kompetisi, jam pertandingan otomatis, statistik laga, dan ekspor grafis video memerlukan pengembangan lanjutan. Ekspor MP4, editor video penuh, AI redaktur, TTS, dan siaran langsung juga belum selesai.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
         }
