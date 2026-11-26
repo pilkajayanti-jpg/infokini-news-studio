@@ -299,7 +299,7 @@ fun InfoKiniStudio() {
                     val title = headline.trim()
                     val crawl = ticker.trim()
                     val caption = videoCaption.trim()
-                    if (title.isNotBlank() || crawl.isNotBlank() || caption.isNotBlank()) {
+                    run {
                         val combined = buildString {
                             if (title.isNotBlank()) append(title)
                             if (title.isNotBlank() && (crawl.isNotBlank() || caption.isNotBlank())) append("\n")
@@ -308,6 +308,8 @@ fun InfoKiniStudio() {
                                 if (isNotEmpty()) append("\n")
                                 append(caption)
                             }
+                            if (isNotEmpty()) append("\n")
+                            append("INFOKINI.NEWS")
                         }
                         val overlayText = SpannableString(combined)
                         if (title.isNotBlank()) {
@@ -317,10 +319,14 @@ fun InfoKiniStudio() {
                         }
                         if (crawl.isNotBlank()) {
                             val crawlStart = combined.indexOf(selectedNewsTemplate.uppercase(Locale.ROOT))
-                            overlayText.setSpan(ForegroundColorSpan(templateBaseColor), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            overlayText.setSpan(BackgroundColorSpan(templateAccentColor), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            overlayText.setSpan(StyleSpan(Typeface.BOLD), crawlStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            val crawlEnd = crawlStart + selectedNewsTemplate.length + 3 + crawl.length
+                            overlayText.setSpan(ForegroundColorSpan(templateBaseColor), crawlStart, crawlEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(BackgroundColorSpan(templateAccentColor), crawlStart, crawlEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            overlayText.setSpan(StyleSpan(Typeface.BOLD), crawlStart, crawlEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                         }
+                        val brandStart = combined.lastIndexOf("INFOKINI.NEWS")
+                        overlayText.setSpan(ForegroundColorSpan(templateAccentColor), brandStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        overlayText.setSpan(StyleSpan(Typeface.BOLD), brandStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                         videoOverlays.add(TextOverlay.createStaticTextOverlay(overlayText))
                     }
                     val targetAspectRatio = if (selectedAspectRatio.startsWith("9:16")) 9f / 16f else 16f / 9f
