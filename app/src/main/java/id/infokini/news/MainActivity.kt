@@ -111,7 +111,7 @@ fun InfoKiniStudio() {
     var reporterTopic by remember { mutableStateOf("") }
     var reporterSourceUrl by remember { mutableStateOf("") }
     var reporterFacts by remember { mutableStateOf("") }
-    var reporterDraft by remember { mutableStateOf("") }
+    var reporterVideoScript by remember { mutableStateOf("") }
     var reporterApproved by remember { mutableStateOf(false) }
     var reporterVerified by remember { mutableStateOf(false) }
     var headline by remember { mutableStateOf("") }
@@ -687,8 +687,8 @@ fun InfoKiniStudio() {
             StudioField("Teks berjalan", ticker, { ticker = it }, "Tulis running text...")
             StudioField("Lokasi berita", location, { location = it }, "Contoh: Cigombong, Kabupaten Bogor")
             }
-            Text("AI REPORTER & AI REDAKTUR", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Ruang kerja untuk mengumpulkan rujukan, memeriksa fakta, dan menyusun draf. Pemantauan otomatis lintas platform serta penulisan AI penuh memerlukan konektor/API resmi dan layanan backend; jangan menganggap unggahan yang belum diverifikasi sebagai fakta.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("Keluaran akhir yang dituju adalah VIDEO BERITA, bukan artikel. Masukkan topik dan sumber, verifikasi fakta, lalu susun naskah narasi serta arahan visual untuk diproses di Editor Video. Pemantauan otomatis lintas platform dan pembuatan video AI penuh memerlukan API resmi serta layanan backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false }, "Contoh: banjir, kebijakan publik, olahraga...")
             StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false }, "Tempel URL berita atau unggahan publik...")
             StudioField("Fakta dan hasil konfirmasi", reporterFacts, { reporterFacts = it; reporterApproved = false }, "Catat siapa, apa, kapan, di mana, bukti, dan tanggapan...")
@@ -696,7 +696,7 @@ fun InfoKiniStudio() {
                 Checkbox(checked = reporterVerified, onCheckedChange = { reporterVerified = it; reporterApproved = false })
                 Text("Sudah diverifikasi dan dikonfirmasi redaksi", color = Color.White, fontSize = 12.sp)
             }
-            StudioField("Draf berita hasil olahan redaksi", reporterDraft, { reporterDraft = it; reporterApproved = false }, "Draf harus ditulis ulang dengan bahasa sendiri...")
+            StudioField("Naskah narasi video (bukan artikel)", reporterVideoScript, { reporterVideoScript = it; reporterApproved = false }, "Tulis kalimat yang akan dibacakan presenter/narator...")
             if (reporterSourceUrl.startsWith("https://") || reporterSourceUrl.startsWith("http://")) {
                 OutlinedButton(onClick = { try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(reporterSourceUrl))) } catch (_: Exception) { Toast.makeText(context, "Tautan tidak dapat dibuka", Toast.LENGTH_SHORT).show() } }, modifier = Modifier.fillMaxWidth()) {
                     Text("BUKA & PERIKSA SUMBER")
@@ -704,13 +704,28 @@ fun InfoKiniStudio() {
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = reporterApproved, onCheckedChange = { checked ->
-                    reporterApproved = checked && reporterVerified && reporterTopic.isNotBlank() && reporterSourceUrl.isNotBlank() && reporterDraft.isNotBlank()
-                    if (checked && !reporterApproved) Toast.makeText(context, "Lengkapi topik, sumber, draf, dan verifikasi terlebih dahulu", Toast.LENGTH_LONG).show()
+                    reporterApproved = checked && reporterVerified && reporterTopic.isNotBlank() && reporterSourceUrl.isNotBlank() && reporterVideoScript.isNotBlank()
+                    if (checked && !reporterApproved) Toast.makeText(context, "Lengkapi topik, sumber, naskah video, dan verifikasi terlebih dahulu", Toast.LENGTH_LONG).show()
                 })
                 Text("Disetujui redaksi untuk diterbitkan / diekspor", color = Color.White, fontSize = 12.sp)
             }
             Text(if (reporterApproved) "Status: DISETUJUI REDAKSI" else "Status: DRAF — BELUM BOLEH DITERBITKAN", color = if (reporterApproved) Color(0xFF7EE0A3) else Color(0xFFFFD27A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Text("Catatan hak cipta: olah fakta menjadi tulisan orisinal; jangan salin artikel, foto, video, atau desain pihak lain. Cantumkan sumber secara lengkap. Penggunaan materi visual pihak lain perlu izin atau lisensi yang sesuai.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            Text("Catatan hak cipta: naskah narasi harus orisinal. Jangan menyalin artikel atau memakai foto, video, musik, maupun logo pihak lain tanpa izin/lisensi yang sesuai. Sumber informasi tetap dicantumkan pada catatan produksi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            Button(onClick = {
+                if (!reporterApproved) {
+                    Toast.makeText(context, "Verifikasi dan persetujuan redaksi diperlukan sebelum menyiapkan video", Toast.LENGTH_LONG).show()
+                } else {
+                    headline = reporterTopic.take(100)
+                    ticker = reporterFacts.take(240)
+                    if (ttsReady) {
+                        tts.language = Locale("id", "ID")
+                        tts.speak(reporterVideoScript, TextToSpeech.QUEUE_FLUSH, null, "infokini-reporter-video-script")
+                    }
+                    Toast.makeText(context, "Naskah video dikirim ke Editor Berita. Pilih visual lalu ekspor MP4.", Toast.LENGTH_LONG).show()
+                }
+            }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)) {
+                Text("SIAPKAN VIDEO BERITA & KIRIM KE EDITOR", fontWeight = FontWeight.Black)
+            }
 
             OutlinedButton(
                 onClick = { picker.launch(arrayOf("image/*", "video/*")) },
