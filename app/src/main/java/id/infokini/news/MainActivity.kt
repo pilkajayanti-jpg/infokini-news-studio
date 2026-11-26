@@ -177,6 +177,7 @@ fun InfoKiniStudio() {
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
             selectedMedia = uri
             mediaLabel = uri.lastPathSegment ?: "Media dipilih"
             videoDurationMs = 0L
@@ -984,7 +985,14 @@ fun InfoKiniStudio() {
                             valueRange = 1000f..videoDurationMs.toFloat()
                         )
                         Button(
-                            onClick = { videoExporter.launch("InfoKini-Video-Edit.mp4") },
+                            onClick = {
+                                val containsReporterMaterial = reporterTopic.isNotBlank() || reporterVideoScript.isNotBlank()
+                                if (containsReporterMaterial && !reporterApproved) {
+                                    Toast.makeText(context, "Video dari AI Reporter belum dapat diekspor. Lengkapi verifikasi dan persetujuan redaksi terlebih dahulu.", Toast.LENGTH_LONG).show()
+                                } else {
+                                    videoExporter.launch("InfoKini-Video-Edit.mp4")
+                                }
+                            },
                             enabled = !videoExporting,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
