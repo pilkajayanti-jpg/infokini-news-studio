@@ -1038,7 +1038,7 @@ fun InfoKiniStudio() {
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
-                        val shareText = "INFO KINI | infokini.news\n" + headline + "\n" + location + "\n\n" + ticker
+                        val shareText = "INFO KINI STUDIO\n" + headline + "\n" + location + "\n\n" + ticker
                         val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareText) }
                         context.startActivity(Intent.createChooser(send, "Bagikan konten InfoKini"))
                     }, modifier = Modifier.weight(1f)) { Text("Bagikan") }
@@ -1082,7 +1082,7 @@ fun InfoKiniStudio() {
                 colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
             ) { Text("PERBARUI PRATINJAU", fontWeight = FontWeight.Black) }
 
-            Text("InfoKini News Studio\nPowered by Wandi Azis", color = Color(0xFFB8C4D9), fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Text("InfoKini Studio\nPowered by Wandi Azis", color = Color(0xFFB8C4D9), fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth())
 
             Text("Catatan: editor foto, pemotongan video, ekspor MP4 dengan judul dan running text, TTS perangkat, serta grafis skor manual tersedia pada tahap awal. Skor otomatis, pengumpulan berita AI dari sumber tepercaya, siaran langsung platform, dan fitur penyuntingan video lanjutan memerlukan integrasi serta pengujian tambahan.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
         }
