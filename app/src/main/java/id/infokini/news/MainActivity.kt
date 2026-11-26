@@ -1,2131 +1,399 @@
 package id.infokini.news
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Typeface
-import android.graphics.RectF
-import android.graphics.Matrix
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import android.widget.Toast
-import android.widget.ImageView
 import android.widget.VideoView
-import android.media.MediaMetadataRetriever
-import java.io.File
-import androidx.media3.common.MediaItem
-import androidx.media3.common.audio.GainProcessor
-import androidx.media3.common.audio.DefaultGainProvider
-import androidx.media3.transformer.EditedMediaItem
-import androidx.media3.transformer.EditedMediaItemSequence
-import androidx.media3.transformer.Composition
-import androidx.media3.transformer.ExportException
-import androidx.media3.transformer.ExportResult
-import androidx.media3.transformer.Transformer
-import androidx.media3.transformer.Effects
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.OverlayEffect
-import androidx.media3.effect.Presentation
-import androidx.media3.effect.Brightness
-import androidx.media3.effect.Contrast
-import androidx.media3.effect.HslAdjustment
-import androidx.media3.effect.TextOverlay
-import androidx.media3.effect.TextureOverlay
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.BackgroundColorSpan
-import android.text.style.ForegroundColorSpan
-import android.text.style.StyleSpan
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
-import kotlinx.coroutines.launch
+import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Locale
+import java.net.URL
+import java.net.URLEncoder
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
-import java.net.URL
-import java.net.HttpURLConnection
-import org.json.JSONObject
-import java.net.URLEncoder
-import androidx.compose.ui.viewinterop.AndroidView
-import java.util.Locale
-import java.net.URI
-import kotlinx.coroutines.delay
 
-private val Navy = Color(0xFF080D4A)
-private val Cyan = Color(0xFF13BDEB)
-private val Ink = Color(0xFF172033)
-
-private fun newsTemplatePalette(template: String): Pair<Int, Int> = when (template) {
-    "Breaking News" -> android.graphics.Color.rgb(115, 12, 24) to android.graphics.Color.rgb(255, 65, 65)
-    "Liputan Desa" -> android.graphics.Color.rgb(58, 78, 45) to android.graphics.Color.rgb(180, 210, 105)
-    "Wawancara" -> android.graphics.Color.rgb(55, 42, 92) to android.graphics.Color.rgb(185, 155, 255)
-    "Olahraga" -> android.graphics.Color.rgb(8, 70, 42) to android.graphics.Color.rgb(111, 220, 135)
-    "Info Cuaca" -> android.graphics.Color.rgb(10, 75, 105) to android.graphics.Color.rgb(85, 210, 235)
-    "Dokumenter" -> android.graphics.Color.rgb(48, 43, 35) to android.graphics.Color.rgb(225, 185, 115)
-    "Kriminal" -> android.graphics.Color.rgb(75, 18, 30) to android.graphics.Color.rgb(240, 70, 70)
-    "Ekonomi / UMKM" -> android.graphics.Color.rgb(75, 58, 18) to android.graphics.Color.rgb(240, 190, 65)
-    "Vertikal Sosial Media" -> android.graphics.Color.rgb(75, 30, 85) to android.graphics.Color.rgb(240, 95, 190)
-    else -> android.graphics.Color.rgb(8, 13, 74) to android.graphics.Color.rgb(19, 189, 235)
-}
+private val Navy = Color(0xFF07142E)
+private val Panel = Color(0xFF112544)
+private val Accent = Color(0xFF16C5E8)
+private val Muted = Color(0xFFB9C9DE)
+private val Gold = Color(0xFFFFC857)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(8, 13, 74)
-        setContent { InfoKiniStudio() }
+        window.statusBarColor = android.graphics.Color.rgb(7, 20, 46)
+        window.navigationBarColor = android.graphics.Color.rgb(7, 20, 46)
+        setContent { InfoKiniApp() }
     }
 }
 
-@OptIn(UnstableApi::class)
+private enum class Page { HOME, VIDEO, PHOTO, TEMPLATE, EDITORIAL, PRESENTER, SPORTS, LIVE }
+
 @Composable
-fun InfoKiniStudio() {
+private fun InfoKiniApp() {
     val context = LocalContext.current
-    val screenScrollState = rememberScrollState()
-    val screenScope = rememberCoroutineScope()
-    var reporterSectionY by remember { mutableIntStateOf(0) }
-    var photoSectionY by remember { mutableIntStateOf(0) }
-    var ttsReady by remember { mutableStateOf(false) }
-    var narrationAudioFile by remember { mutableStateOf<File?>(null) }
-    var narrationAudioScript by remember { mutableStateOf("") }
-    var narrationGenerating by remember { mutableStateOf(false) }
-    var ttsVoiceNames by remember { mutableStateOf(listOf("Default Android")) }
-    var selectedTtsVoice by remember { mutableStateOf("Default Android") }
-    var ttsVoiceMenu by remember { mutableStateOf(false) }
-    var aiPresenterEnabled by remember { mutableStateOf(false) }
-    var presenterStyle by remember { mutableStateOf("Presenter Pria") }
-    var presenterMenu by remember { mutableStateOf(false) }
-    var deliveryStyle by remember { mutableStateOf("Formal / Berita") }
-    var deliveryMenu by remember { mutableStateOf(false) }
-    val deliveryStyles = listOf("Formal / Berita", "Santai / Akrab", "Breaking News", "Dokumenter", "Semangat / Olahraga")
-    val tts = remember {
-        TextToSpeech(context) { status ->
-            ttsReady = status == TextToSpeech.SUCCESS
-        }
-    }
-    LaunchedEffect(ttsReady) {
-        if (ttsReady) {
-            val voices = tts.voices?.filter { it.locale.language == "id" }.orEmpty()
-            val names = voices.map { it.name }.distinct()
-            ttsVoiceNames = names.ifEmpty { listOf("Default Android") }
-            if (selectedTtsVoice !in ttsVoiceNames) selectedTtsVoice = ttsVoiceNames.first()
-        }
-    }
+    val prefs = remember { context.getSharedPreferences("infokini_v3", Context.MODE_PRIVATE) }
+    var page by remember { mutableStateOf(Page.HOME) }
+    var headline by remember { mutableStateOf(prefs.getString("headline", "").orEmpty()) }
+    var ticker by remember { mutableStateOf(prefs.getString("ticker", "").orEmpty()) }
+    var script by remember { mutableStateOf(prefs.getString("script", "").orEmpty()) }
+    var topic by remember { mutableStateOf(prefs.getString("topic", "").orEmpty()) }
+    var sourceA by remember { mutableStateOf(prefs.getString("source_a", "").orEmpty()) }
+    var sourceB by remember { mutableStateOf(prefs.getString("source_b", "").orEmpty()) }
+    var template by remember { mutableStateOf(prefs.getString("template", "InfoKini Utama").orEmpty()) }
+    var video by remember { mutableStateOf(prefs.getString("video", null)?.let(Uri::parse)) }
+    var photo by remember { mutableStateOf(prefs.getString("photo", null)?.let(Uri::parse)) }
+    var music by remember { mutableStateOf<Uri?>(null) }
+    var results by remember { mutableStateOf<List<String>>(emptyList()) }
+    var searchStatus by remember { mutableStateOf("Cari judul berita dari Google News RSS. Baca sumber asli sebelum digunakan.") }
+    var presenter by remember { mutableStateOf("Presenter perempuan") }
+    var ttsStatus by remember { mutableStateOf("Gunakan mesin Text-to-Speech yang tersedia di Android.") }
+    var homeTeam by remember { mutableStateOf("Tuan Rumah") }
+    var awayTeam by remember { mutableStateOf("Tim Tamu") }
+    var homeScore by remember { mutableIntStateOf(0) }
+    var awayScore by remember { mutableIntStateOf(0) }
+    val tts = remember { TextToSpeech(context) { status ->
+        ttsStatus = if (status == TextToSpeech.SUCCESS) "Mesin TTS siap. Suara Indonesia bergantung pada paket suara perangkat." else "Mesin TTS tidak tersedia."
+    } }
     DisposableEffect(tts) { onDispose { tts.stop(); tts.shutdown() } }
-    fun applyNarrationStyle() {
-        when (deliveryStyle) {
-            "Santai / Akrab" -> { tts.setSpeechRate(1.02f); tts.setPitch(1.04f) }
-            "Breaking News" -> { tts.setSpeechRate(1.12f); tts.setPitch(1.02f) }
-            "Dokumenter" -> { tts.setSpeechRate(0.88f); tts.setPitch(0.96f) }
-            "Semangat / Olahraga" -> { tts.setSpeechRate(1.08f); tts.setPitch(1.10f) }
-            else -> { tts.setSpeechRate(0.94f); tts.setPitch(1.0f) }
-        }
+    LaunchedEffect(headline, ticker, script, topic, sourceA, sourceB, template, video, photo) {
+        prefs.edit().putString("headline", headline).putString("ticker", ticker)
+            .putString("script", script).putString("topic", topic).putString("source_a", sourceA)
+            .putString("source_b", sourceB).putString("template", template)
+            .putString("video", video?.toString()).putString("photo", photo?.toString()).apply()
     }
-    var aiBackendUrl by remember { mutableStateOf(context.getSharedPreferences("infokini_ai", 0).getString("backend_url", "").orEmpty()) }
-    var aiGenerating by remember { mutableStateOf(false) }
-    var aiBackendStatus by remember { mutableStateOf("Backend AI belum dikonfigurasi.") }
-    var aiVerificationNotes by remember { mutableStateOf("") }
-    var integrationTesting by remember { mutableStateOf(false) }
-    var integrationStatus by remember { mutableStateOf("Belum diuji. Masukkan alamat backend HTTPS lalu tekan Uji koneksi.") }
-    var presenterBackendUrl by remember { mutableStateOf(context.getSharedPreferences("infokini_integrations", 0).getString("presenter_url", "").orEmpty()) }
-    var presenterStatus by remember { mutableStateOf("Belum terhubung") }
-    var youtubeStatus by remember { mutableStateOf("Perlu otorisasi akun dan konfigurasi siaran") }
-    var tiktokStatus by remember { mutableStateOf("Perlu akses LIVE dan konfigurasi siaran") }
-    var facebookStatus by remember { mutableStateOf("Perlu otorisasi akun dan konfigurasi siaran") }
-    val reporterDraftPrefs = remember { context.getSharedPreferences("infokini_reporter_draft", 0) }
-    var reporterTopic by remember { mutableStateOf(reporterDraftPrefs.getString("topic", "").orEmpty()) }
-    var rssNewsItems by remember { mutableStateOf<List<ReporterRssItem>>(emptyList()) }
-    var rssLoading by remember { mutableStateOf(false) }
-    var rssError by remember { mutableStateOf("") }
-    var reporterSourceUrl by remember { mutableStateOf(reporterDraftPrefs.getString("source_url", "").orEmpty()) }
-    var reporterComparisonSourceUrl by remember { mutableStateOf(reporterDraftPrefs.getString("comparison_url", "").orEmpty()) }
-    var reporterFacts by remember { mutableStateOf(reporterDraftPrefs.getString("facts", "").orEmpty()) }
-    var reporterVideoScript by remember { mutableStateOf(reporterDraftPrefs.getString("video_script", "").orEmpty()) }
-    var reporterApproved by remember { mutableStateOf(false) }
-    var reporterMaterialAppliedToVideo by remember { mutableStateOf(false) }
-    var reporterVerified by remember { mutableStateOf(false) }
-    LaunchedEffect(reporterTopic, reporterSourceUrl, reporterComparisonSourceUrl, reporterFacts, reporterVideoScript) {
-        reporterDraftPrefs.edit()
-            .putString("topic", reporterTopic)
-            .putString("source_url", reporterSourceUrl)
-            .putString("comparison_url", reporterComparisonSourceUrl)
-            .putString("facts", reporterFacts)
-            .putString("video_script", reporterVideoScript)
-            .apply()
+    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { runCatching { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }; video = it }
     }
-    val videoEditorPrefs = remember { context.getSharedPreferences("infokini_video_editor", 0) }
-    var headline by remember { mutableStateOf(videoEditorPrefs.getString("headline", "").orEmpty()) }
-    var ticker by remember { mutableStateOf(videoEditorPrefs.getString("ticker", "").orEmpty()) }
-    var videoCaption by remember { mutableStateOf(videoEditorPrefs.getString("caption", "").orEmpty()) }
-    var location by remember { mutableStateOf(videoEditorPrefs.getString("location", "").orEmpty()) }
-    var projectName by remember { mutableStateOf("Proyek berita baru") }
-    var savedProjectNames by remember { mutableStateOf(context.getSharedPreferences("infokini_video_projects", 0).getStringSet("project_names", emptySet())?.toList()?.sorted().orEmpty()) }
-    var projectMenuExpanded by remember { mutableStateOf(false) }
-    var projectPendingDelete by remember { mutableStateOf<String?>(null) }
-    val newsTemplates = listOf("Breaking News", "Berita Umum", "Liputan Desa", "Wawancara", "Olahraga", "Info Cuaca", "Dokumenter", "Kriminal", "Ekonomi / UMKM", "Vertikal Sosial Media")
-    var selectedNewsTemplate by remember { mutableStateOf(videoEditorPrefs.getString("template", "Berita Umum") ?: "Berita Umum") }
-    var templateMenu by remember { mutableStateOf(false) }
-    var selectedAspectRatio by remember { mutableStateOf(videoEditorPrefs.getString("aspect_ratio", "16:9 • YouTube / TV") ?: "16:9 • YouTube / TV") }
-    var aspectMenu by remember { mutableStateOf(false) }
-    var selectedMedia by remember { mutableStateOf(videoEditorPrefs.getString("primary_video", null)?.let { runCatching { Uri.parse(it) }.getOrNull() }) }
-    var additionalVideoUris by remember { mutableStateOf(videoEditorPrefs.getString("additional_videos", "").orEmpty().split("\n").filter { it.startsWith("content://") }.mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }) }
-    var clipTrimPercentages by remember { mutableStateOf<Map<String, Pair<Float, Float>>>(run {
-        val saved = runCatching { JSONObject(videoEditorPrefs.getString("clip_trims", "{}").orEmpty()) }.getOrNull()
-        val restored = mutableMapOf<String, Pair<Float, Float>>()
-        if (saved != null) {
-            val keys = saved.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                val range = saved.optJSONArray(key)
-                if (range != null && range.length() >= 2) restored[key] = range.optDouble(0, 0.0).toFloat() to range.optDouble(1, 100.0).toFloat()
-            }
-        }
-        restored
-    }) }
-    LaunchedEffect(headline, ticker, videoCaption, location, selectedNewsTemplate, selectedAspectRatio, selectedMedia, additionalVideoUris, clipTrimPercentages, videoBrightness, videoContrast, videoSaturation) {
-        val trims = JSONObject()
-        clipTrimPercentages.forEach { (key, range) -> trims.put(key, org.json.JSONArray().put(range.first).put(range.second)) }
-        videoEditorPrefs.edit()
-            .putString("headline", headline)
-            .putString("ticker", ticker)
-            .putString("caption", videoCaption)
-            .putString("location", location)
-            .putString("template", selectedNewsTemplate)
-            .putString("aspect_ratio", selectedAspectRatio)
-            .putString("primary_video", selectedMedia?.toString())
-            .putString("additional_videos", additionalVideoUris.joinToString("\n") { it.toString() })
-            .putString("clip_trims", trims.toString())
-            .putFloat("video_brightness", videoBrightness)
-            .putFloat("video_contrast", videoContrast)
-            .putFloat("video_saturation", videoSaturation)
-            .apply()
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { runCatching { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }; photo = it }
     }
-    var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
-    val audioPreferences = remember { context.getSharedPreferences("infokini_audio", 0) }
-    var backgroundMusicUri by remember { mutableStateOf(audioPreferences.getString("music_uri", null)?.let { Uri.parse(it) }) }
-    var backgroundMusicLabel by remember { mutableStateOf(audioPreferences.getString("music_label", null) ?: "Belum ada musik dipilih") }
-    var backgroundMusicEnabled by remember { mutableStateOf(audioPreferences.getBoolean("music_enabled", true)) }
-    var selectedMusicTheme by remember { mutableStateOf(audioPreferences.getString("music_theme", "InfoKini News Theme") ?: "InfoKini News Theme") }
-    var musicVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("music_volume", 0.25f)) }
-    var originalAudioVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("original_audio_volume", 1f)) }
-    var narrationVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("narration_volume", 1f)) }
-    var musicThemeMenu by remember { mutableStateOf(false) }
-    var photoBrightness by remember { mutableFloatStateOf(0f) }
-    var photoContrast by remember { mutableFloatStateOf(1f) }
-    var photoSaturation by remember { mutableFloatStateOf(1f) }
-    var photoRotation by remember { mutableFloatStateOf(0f) }
-    var photoFlipHorizontal by remember { mutableStateOf(false) }
-    var photoFlipVertical by remember { mutableStateOf(false) }
-    var photoCaption by remember { mutableStateOf("") }
-    var photoBrandWatermark by remember { mutableStateOf(true) }
-    var videoDurationMs by remember { mutableLongStateOf(0L) }
-    var videoStartMs by remember { mutableFloatStateOf(0f) }
-    var videoEndMs by remember { mutableFloatStateOf(0f) }
-    var previewSeekMs by remember { mutableFloatStateOf(0f) }
-    var videoBrightness by remember { mutableFloatStateOf(videoEditorPrefs.getFloat("video_brightness", 0f)) }
-    var videoContrast by remember { mutableFloatStateOf(videoEditorPrefs.getFloat("video_contrast", 0f)) }
-    var videoSaturation by remember { mutableFloatStateOf(videoEditorPrefs.getFloat("video_saturation", 0f)) }
-    var previewVideoView by remember { mutableStateOf<VideoView?>(null) }
-    LaunchedEffect(selectedMedia) {
-        val mediaUri = selectedMedia
-        if (mediaUri != null) {
-            mediaLabel = mediaUri.lastPathSegment ?: "Media tersimpan"
-            val duration = withContext(Dispatchers.IO) {
-                runCatching {
-                    if (context.contentResolver.getType(mediaUri)?.startsWith("video/") == true) {
-                        val retriever = MediaMetadataRetriever()
-                        try {
-                            retriever.setDataSource(context, mediaUri)
-                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                        } finally {
-                            retriever.release()
-                        }
-                    } else 0L
-                }.getOrDefault(0L)
-            }
-            videoDurationMs = duration
-            videoStartMs = 0f
-            videoEndMs = duration.toFloat()
-            previewSeekMs = 0f
-        } else {
-            videoDurationMs = 0L
-            videoStartMs = 0f
-            videoEndMs = 0f
-        }
-    }
-    var videoExporting by remember { mutableStateOf(false) }
-    var pendingVideoOutput by remember { mutableStateOf<Uri?>(null) }
-    var live by remember { mutableStateOf(false) }
-    var footballMode by remember { mutableStateOf(false) }
-    var sportsNewsMode by remember { mutableStateOf(false) }
-    var sportType by remember { mutableStateOf("Sepak Bola") }
-    var sportTypeMenu by remember { mutableStateOf(false) }
-    var matchRound by remember { mutableStateOf("") }
-    var matchVenue by remember { mutableStateOf("") }
-    var matchReferee by remember { mutableStateOf("") }
-    var homeTeam by remember { mutableStateOf("") }
-    var awayTeam by remember { mutableStateOf("") }
-    var homeScore by remember { mutableStateOf("0") }
-    var awayScore by remember { mutableStateOf("0") }
-    var competition by remember { mutableStateOf("") }
-    var matchTime by remember { mutableStateOf("00:00") }
-    var matchStatus by remember { mutableStateOf("BELUM DIMULAI") }
-    var homeYellowCards by remember { mutableIntStateOf(0) }
-    var awayYellowCards by remember { mutableIntStateOf(0) }
-    var homeRedCards by remember { mutableIntStateOf(0) }
-    var awayRedCards by remember { mutableIntStateOf(0) }
-    var matchEvents by remember { mutableStateOf("") }
-    var homeLogoUri by remember { mutableStateOf<Uri?>(null) }
-    var awayLogoUri by remember { mutableStateOf<Uri?>(null) }
-    var competitionLogoUri by remember { mutableStateOf<Uri?>(null) }
-    var matchClockRunning by remember { mutableStateOf(false) }
-    var matchElapsedSeconds by remember { mutableIntStateOf(0) }
-    LaunchedEffect(matchClockRunning) {
-        while (matchClockRunning) {
-            delay(1000)
-            matchElapsedSeconds += 1
-            matchTime = String.format(Locale.US, "%02d:%02d", matchElapsedSeconds / 60, matchElapsedSeconds % 60)
-        }
-    }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
-            selectedMedia = uri
-            mediaLabel = uri.lastPathSegment ?: "Media dipilih"
-            videoDurationMs = 0L
-            videoStartMs = 0f
-            videoEndMs = 0f
-            if (context.contentResolver.getType(uri)?.startsWith("video/") == true) {
-                try {
-                    val metadata = MediaMetadataRetriever()
-                    metadata.setDataSource(context, uri)
-                    videoDurationMs = metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                    videoEndMs = videoDurationMs.toFloat()
-                    metadata.release()
-                } catch (_: Exception) {
-                    Toast.makeText(context, "Durasi video tidak dapat dibaca", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
+    val pickMusic = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { runCatching { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }; music = it }
     }
 
-
-    fun keepLogoPermission(uri: Uri?) {
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: Exception) {
-                // Some document providers do not offer persistable permissions.
-            }
-        }
-    }
-    val multiClipPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        val validVideos = uris.filter { uri ->
-            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
-            context.contentResolver.getType(uri)?.startsWith("video/") == true
-        }
-        additionalVideoUris = (additionalVideoUris + validVideos).distinct().filter { it != selectedMedia }
-        if (validVideos.size != uris.size) {
-            Toast.makeText(context, "Hanya file video yang ditambahkan ke timeline", Toast.LENGTH_SHORT).show()
-        }
-    }
-    val musicPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
-            backgroundMusicUri = uri
-            backgroundMusicLabel = uri.lastPathSegment ?: "Musik latar dipilih"
-            backgroundMusicEnabled = true
-            audioPreferences.edit().putString("music_uri", uri.toString()).putString("music_label", backgroundMusicLabel).putBoolean("music_enabled", true).apply()
-        }
-    }
-    val homeLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
-        keepLogoPermission(it); homeLogoUri = it
-    }
-    val awayLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
-        keepLogoPermission(it); awayLogoUri = it
-    }
-    val competitionLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
-        keepLogoPermission(it); competitionLogoUri = it
-    }
-
-    val videoExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { outputUri ->
-        if (outputUri != null) {
-            val sourceUri = selectedMedia
-            if (sourceUri == null || videoDurationMs <= 0L) {
-                Toast.makeText(context, "Pilih video yang valid terlebih dahulu", Toast.LENGTH_LONG).show()
-            } else if (narrationGenerating) {
-                Toast.makeText(context, "Tunggu sampai audio narator selesai dibuat", Toast.LENGTH_LONG).show()
-            } else if (videoEndMs.toLong() <= videoStartMs.toLong()) {
-                Toast.makeText(context, "Waktu akhir harus lebih besar dari waktu awal", Toast.LENGTH_LONG).show()
-            } else {
-                try {
-                    videoExporting = true
-                    pendingVideoOutput = outputUri
-                    val clipping = MediaItem.ClippingConfiguration.Builder()
-                        .setStartPositionMs(videoStartMs.toLong())
-                        .setEndPositionMs(videoEndMs.toLong())
-                        .build()
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(sourceUri)
-                        .setClippingConfiguration(clipping)
-                        .build()
-                    val videoOverlays = mutableListOf<TextureOverlay>()
-                    val (templateBaseColor, templateAccentColor) = newsTemplatePalette(selectedNewsTemplate)
-                    val title = headline.trim()
-                    val crawl = ticker.trim()
-                    val caption = videoCaption.trim()
-                    run {
-                        val combined = buildString {
-                            if (title.isNotBlank()) append(title)
-                            if (title.isNotBlank() && (crawl.isNotBlank() || caption.isNotBlank())) append("\n")
-                            if (crawl.isNotBlank()) append(selectedNewsTemplate.uppercase(Locale.ROOT)).append("  •  ").append(crawl)
-                            if (caption.isNotBlank()) {
-                                if (isNotEmpty()) append("\n")
-                                append(caption)
-                            }
-                            if (isNotEmpty()) append("\n")
-                            append("INFOKINI.NEWS")
-                        }
-                        val overlayText = SpannableString(combined)
-                        if (title.isNotBlank()) {
-                            overlayText.setSpan(ForegroundColorSpan(android.graphics.Color.WHITE), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            overlayText.setSpan(BackgroundColorSpan(templateBaseColor), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            overlayText.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        }
-                        if (crawl.isNotBlank()) {
-                            val crawlStart = combined.indexOf(selectedNewsTemplate.uppercase(Locale.ROOT))
-                            val crawlEnd = crawlStart + selectedNewsTemplate.length + 3 + crawl.length
-                            overlayText.setSpan(ForegroundColorSpan(templateBaseColor), crawlStart, crawlEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            overlayText.setSpan(BackgroundColorSpan(templateAccentColor), crawlStart, crawlEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            overlayText.setSpan(StyleSpan(Typeface.BOLD), crawlStart, crawlEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        }
-                        val brandStart = combined.lastIndexOf("INFOKINI.NEWS")
-                        overlayText.setSpan(ForegroundColorSpan(templateAccentColor), brandStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        overlayText.setSpan(StyleSpan(Typeface.BOLD), brandStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        videoOverlays.add(TextOverlay.createStaticTextOverlay(overlayText))
-                    }
-                    val targetAspectRatio = when {
-                        selectedAspectRatio.startsWith("9:16") -> 9f / 16f
-                        selectedAspectRatio.startsWith("1:1") -> 1f
-                        else -> 16f / 9f
-                    }
-                    val aspectPresentation = Presentation.createForAspectRatio(
-                        targetAspectRatio,
-                        Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
-                    )
-                    val videoEffects = mutableListOf<androidx.media3.common.Effect>(aspectPresentation)
-                    if (videoBrightness != 0f) videoEffects.add(Brightness(videoBrightness.coerceIn(-1f, 1f)))
-                    if (videoContrast != 0f) videoEffects.add(Contrast(videoContrast.coerceIn(-1f, 1f)))
-                    if (videoSaturation != 0f) videoEffects.add(HslAdjustment.Builder().adjustSaturation(videoSaturation.coerceIn(-100f, 100f)).build())
-                    if (videoOverlays.isNotEmpty()) {
-                        videoEffects.add(OverlayEffect(videoOverlays))
-                    }
-                    val videoAudioProcessor = GainProcessor(DefaultGainProvider.Builder(originalAudioVolume.coerceIn(0f, 1f)).build())
-                    val effects = Effects(listOf(videoAudioProcessor), videoEffects)
-                    val editedItems = mutableListOf<EditedMediaItem>()
-                    editedItems.add(EditedMediaItem.Builder(mediaItem).setEffects(effects).build())
-                    additionalVideoUris.filter { it != sourceUri }.forEach { clipUri ->
-                        val clipMetadata = MediaMetadataRetriever()
-                        val clipDuration = try {
-                            clipMetadata.setDataSource(context, clipUri)
-                            clipMetadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                        } finally {
-                            clipMetadata.release()
-                        }
-                        val trim = clipTrimPercentages[clipUri.toString()] ?: (0f to 100f)
-                        val clipMediaItem = if (clipDuration > 0L && trim.second > trim.first) {
-                            val startMs = (clipDuration * trim.first / 100f).toLong()
-                            val endMs = (clipDuration * trim.second / 100f).toLong().coerceAtLeast(startMs + 1L)
-                            MediaItem.Builder().setUri(clipUri).setClippingConfiguration(
-                                MediaItem.ClippingConfiguration.Builder()
-                                    .setStartPositionMs(startMs)
-                                    .setEndPositionMs(endMs.coerceAtMost(clipDuration))
-                                    .build()
-                            ).build()
-                        } else MediaItem.fromUri(clipUri)
-                        val clipItem = EditedMediaItem.Builder(clipMediaItem).setEffects(effects).build()
-                        editedItems.add(clipItem)
-                    }
-                    val compositionSequences = mutableListOf<EditedMediaItemSequence>()
-                    compositionSequences.add(EditedMediaItemSequence.withAudioAndVideoFrom(editedItems))
-                    if (backgroundMusicEnabled && backgroundMusicUri != null) {
-                        val musicAudioProcessor = GainProcessor(DefaultGainProvider.Builder(musicVolume.coerceIn(0f, 1f)).build())
-                        val musicEffects = Effects(listOf(musicAudioProcessor), emptyList())
-                        val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(backgroundMusicUri!!)).setEffects(musicEffects).build()
-                        compositionSequences.add(
-                            EditedMediaItemSequence.withAudioFrom(listOf(musicItem))
-                                .buildUpon().setIsLooping(true).build()
-                        )
-                    }
-                    val currentNarrationScript = listOf(headline.trim(), ticker.trim(), videoCaption.trim()).filter { it.isNotBlank() }.joinToString(". ")
-                    narrationAudioFile?.takeIf { it.exists() && it.length() > 0L && narrationAudioScript == currentNarrationScript }?.let { narrationFile ->
-                        val narrationGain = GainProcessor(DefaultGainProvider.Builder(narrationVolume.coerceIn(0f, 1f)).build())
-                        val narrationEffects = Effects(listOf(narrationGain), emptyList())
-                        val narrationItem = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narrationFile))).setEffects(narrationEffects).build()
-                        compositionSequences.add(EditedMediaItemSequence.withAudioFrom(listOf(narrationItem)))
-                    }
-                    val composition = Composition.Builder(compositionSequences).build()
-                    val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
-                    val transformer = Transformer.Builder(context)
-                        .addListener(object : Transformer.Listener {
-                            override fun onCompleted(composition: androidx.media3.transformer.Composition, exportResult: ExportResult) {
-                                try {
-                                    val destination = pendingVideoOutput ?: throw IllegalStateException("Lokasi simpan hilang")
-                                    context.contentResolver.openOutputStream(destination)?.use { out ->
-                                        outputFile.inputStream().use { input -> input.copyTo(out) }
-                                    } ?: throw IllegalStateException("File tujuan tidak dapat dibuka")
-                                    outputFile.delete()
-                                    videoExporting = false
-                                    pendingVideoOutput = null
-                                    Toast.makeText(context, "Video MP4 berhasil diekspor", Toast.LENGTH_LONG).show()
-                                } catch (error: Exception) {
-                                    outputFile.delete()
-                                    videoExporting = false
-                                    pendingVideoOutput = null
-                                    Toast.makeText(context, "Gagal menyimpan MP4: ${error.message}", Toast.LENGTH_LONG).show()
-                                }
-                            }
-
-                            override fun onError(composition: androidx.media3.transformer.Composition, exportResult: ExportResult, exportException: ExportException) {
-                                outputFile.delete()
-                                videoExporting = false
-                                pendingVideoOutput = null
-                                Toast.makeText(context, "Ekspor video gagal: ${exportException.message}", Toast.LENGTH_LONG).show()
-                            }
-                        })
-                        .build()
-                    transformer.start(composition, outputFile.absolutePath)
-                } catch (error: Exception) {
-                    videoExporting = false
-                    pendingVideoOutput = null
-                    Toast.makeText(context, "Tidak dapat memulai ekspor: ${error.message}", Toast.LENGTH_LONG).show()
+    MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Navy, surface = Panel)) {
+        Scaffold(containerColor = Navy, bottomBar = {
+            NavigationBar(containerColor = Panel) {
+                listOf(Page.HOME, Page.VIDEO, Page.PHOTO, Page.EDITORIAL).forEach { item ->
+                    NavigationBarItem(selected = page == item, onClick = { page = item },
+                        icon = { Text(when (item) { Page.HOME -> "⌂"; Page.VIDEO -> "▶"; Page.PHOTO -> "▧"; else -> "✎" }, fontSize = 18.sp) },
+                        label = { Text(when (item) { Page.HOME -> "Home"; Page.VIDEO -> "Video"; Page.PHOTO -> "Foto"; else -> "Redaktur" }, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Accent, selectedTextColor = Accent, indicatorColor = Color(0xFF244564), unselectedIconColor = Muted, unselectedTextColor = Muted))
                 }
             }
-        }
-    }
-
-    val matchGraphicExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { outputUri ->
-        if (outputUri != null) {
-            try {
-                val graphic = Bitmap.createBitmap(1080, 560, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(graphic)
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create("sans-serif", Typeface.BOLD) }
-                paint.color = android.graphics.Color.rgb(8, 13, 74)
-                canvas.drawRect(0f, 0f, 1080f, 560f, paint)
-                paint.color = android.graphics.Color.rgb(19, 189, 235)
-                canvas.drawRect(0f, 0f, 1080f, 12f, paint)
-                paint.textSize = 38f
-                canvas.drawText("INFO KINI  •  infokini.news", 48f, 78f, paint)
-                if (competitionLogoUri != null) {
-                    try {
-                        val competitionLogo = context.contentResolver.openInputStream(competitionLogoUri!!)?.use { BitmapFactory.decodeStream(it) }
-                        if (competitionLogo != null) {
-                            canvas.drawBitmap(competitionLogo, null, RectF(930f, 28f, 1030f, 128f), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-                            competitionLogo.recycle()
-                        }
-                    } catch (_: Exception) { }
-                }
-                paint.color = android.graphics.Color.WHITE
-                paint.textSize = 30f
-                canvas.drawText(competition.ifBlank { "PERTANDINGAN" }.take(42), 48f, 142f, paint)
-                fun drawLogo(uri: Uri?, left: Float) {
-                    if (uri == null) return
-                    try {
-                        val logo = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-                        if (logo != null) {
-                            val dst = RectF(left, 180f, left + 132f, 312f)
-                            canvas.drawBitmap(logo, null, dst, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-                            logo.recycle()
-                        }
-                    } catch (_: Exception) { }
-                }
-                drawLogo(homeLogoUri, 80f)
-                drawLogo(awayLogoUri, 868f)
-                paint.color = android.graphics.Color.WHITE
-                paint.textSize = 44f
-                canvas.drawText(homeTeam.ifBlank { "TIM A" }.take(18), 235f, 238f, paint)
-                canvas.drawText(awayTeam.ifBlank { "TIM B" }.take(18), 650f, 238f, paint)
-                paint.typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
-                paint.textSize = 100f
-                canvas.drawText(homeScore, 390f, 360f, paint)
-                canvas.drawText("-", 510f, 360f, paint)
-                canvas.drawText(awayScore, 590f, 360f, paint)
-                paint.color = android.graphics.Color.rgb(19, 189, 235)
-                paint.textSize = 34f
-                canvas.drawText("$matchTime  •  $matchStatus", 300f, 430f, paint)
-                paint.color = android.graphics.Color.WHITE
-                paint.textSize = 24f
-                canvas.drawText("KUNING $homeYellowCards  MERAH $homeRedCards", 55f, 488f, paint)
-                canvas.drawText("KUNING $awayYellowCards  MERAH $awayRedCards", 600f, 488f, paint)
-                paint.color = android.graphics.Color.rgb(19, 189, 235)
-                paint.textSize = 22f
-                val eventLine = matchEvents.ifBlank { ticker }.take(78)
-                if (eventLine.isNotBlank()) canvas.drawText(eventLine, 55f, 535f, paint)
-                context.contentResolver.openOutputStream(outputUri)?.use {
-                    if (!graphic.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IllegalStateException("PNG gagal disimpan")
-                } ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka")
-                graphic.recycle()
-                Toast.makeText(context, "Grafis pertandingan berhasil diekspor", Toast.LENGTH_LONG).show()
-            } catch (error: Exception) {
-                Toast.makeText(context, "Ekspor grafis gagal: ${error.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    val posterExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { outputUri ->
-        if (outputUri != null) {
-            val sourceUri = selectedMedia
-            if (sourceUri == null || context.contentResolver.getType(sourceUri)?.startsWith("image/") != true) {
-                Toast.makeText(context, "Pilih foto terlebih dahulu untuk membuat poster", Toast.LENGTH_LONG).show()
-            } else {
-                try {
-                    val source = context.contentResolver.openInputStream(sourceUri)?.use { BitmapFactory.decodeStream(it) }
-                        ?: throw IllegalStateException("Foto tidak dapat dibaca")
-                    val transform = Matrix().apply {
-                        postScale(if (photoFlipHorizontal) -1f else 1f, if (photoFlipVertical) -1f else 1f)
-                        postRotate(photoRotation)
-                    }
-                    val posterSource = Bitmap.createBitmap(source, 0, 0, source.width, source.height, transform, true)
-                    val poster = Bitmap.createBitmap(1080, 1920, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(poster)
-                    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-                        colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
-                    }
-                    val scale = maxOf(1080f / posterSource.width, 1920f / posterSource.height)
-                    val drawWidth = posterSource.width * scale
-                    val drawHeight = posterSource.height * scale
-                    val imageRect = RectF((1080f - drawWidth) / 2f, (1920f - drawHeight) / 2f, (1080f + drawWidth) / 2f, (1920f + drawHeight) / 2f)
-                    canvas.drawBitmap(posterSource, null, imageRect, paint)
-                    paint.colorFilter = null
-                    paint.color = android.graphics.Color.argb(225, 8, 13, 74)
-                    canvas.drawRect(0f, 1320f, 1080f, 1920f, paint)
-                    paint.color = android.graphics.Color.rgb(19, 189, 235)
-                    paint.typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
-                    paint.textSize = 48f
-                    canvas.drawText("INFO KINI  •  infokini.news", 58f, 1400f, paint)
-                    paint.color = android.graphics.Color.WHITE
-                    paint.textSize = 58f
-                    paint.typeface = Typeface.create("sans-serif", Typeface.BOLD)
-                    val words = headline.ifBlank { "INFO TERKINI" }.split(" ")
-                    var line = ""
-                    var y = 1500f
-                    for (word in words) {
-                        val candidate = if (line.isEmpty()) word else "$line $word"
-                        if (paint.measureText(candidate) > 960f && line.isNotEmpty()) {
-                            canvas.drawText(line, 58f, y, paint)
-                            y += 72f
-                            line = word
-                        } else line = candidate
-                    }
-                    if (line.isNotEmpty() && y < 1705f) canvas.drawText(line, 58f, y, paint)
-                    paint.color = android.graphics.Color.rgb(19, 189, 235)
-                    paint.textSize = 34f
-                    paint.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                    canvas.drawText(location.ifBlank { "Berita terkini" }, 58f, 1770f, paint)
-                    paint.color = android.graphics.Color.WHITE
-                    paint.textSize = 30f
-                    canvas.drawText(ticker.take(62), 58f, 1830f, paint)
-                    context.contentResolver.openOutputStream(outputUri)?.use { poster.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                        ?: throw IllegalStateException("File tujuan tidak dapat dibuka")
-                    if (posterSource !== source && !source.isRecycled) source.recycle()
-                    if (!posterSource.isRecycled) posterSource.recycle()
-                    poster.recycle()
-                    Toast.makeText(context, "Poster InfoKini berhasil diekspor dengan pengaturan edit foto", Toast.LENGTH_LONG).show()
-                } catch (error: Exception) {
-                    Toast.makeText(context, "Ekspor gagal: ${error.message ?: "kesalahan file"}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-
-
-    val photoExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { outputUri ->
-        if (outputUri != null) {
-            val sourceUri = selectedMedia
-            if (sourceUri == null || context.contentResolver.getType(sourceUri)?.startsWith("image/") != true) {
-                Toast.makeText(context, "Pilih foto terlebih dahulu", Toast.LENGTH_LONG).show()
-            } else {
-                try {
-                    val source = context.contentResolver.openInputStream(sourceUri)?.use { BitmapFactory.decodeStream(it) }
-                        ?: throw IllegalStateException("Foto tidak dapat dibaca")
-                    val rotateMatrix = Matrix().apply { postScale(if (photoFlipHorizontal) -1f else 1f, if (photoFlipVertical) -1f else 1f); postRotate(photoRotation) }
-                    val rotated = Bitmap.createBitmap(source, 0, 0, source.width, source.height, rotateMatrix, true)
-                    val edited = Bitmap.createBitmap(rotated.width, rotated.height, Bitmap.Config.ARGB_8888)
-                    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-                        colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
-                    }
-                    val editCanvas = Canvas(edited)
-                    editCanvas.drawBitmap(rotated, 0f, 0f, paint)
-                    if (photoCaption.isNotBlank() || photoBrandWatermark) {
-                        val overlay = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(205, 8, 13, 74) }
-                        val barHeight = (edited.height * 0.19f).coerceAtLeast(110f)
-                        editCanvas.drawRect(0f, edited.height - barHeight, edited.width.toFloat(), edited.height.toFloat(), overlay)
-                        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            color = android.graphics.Color.WHITE
-                            typeface = Typeface.create("sans-serif", Typeface.BOLD)
-                            textSize = (edited.width * 0.045f).coerceIn(22f, 64f)
-                        }
-                        if (photoCaption.isNotBlank()) {
-                            val words = photoCaption.trim().split(Regex("\\s+"))
-                            var line = ""
-                            var y = edited.height - barHeight + labelPaint.textSize * 1.5f
-                            val maxWidth = edited.width * 0.9f
-                            for (word in words) {
-                                val candidate = if (line.isEmpty()) word else "$line $word"
-                                if (labelPaint.measureText(candidate) > maxWidth && line.isNotEmpty()) {
-                                    editCanvas.drawText(line, edited.width * 0.05f, y, labelPaint)
-                                    y += labelPaint.textSize * 1.2f
-                                    line = word
-                                } else line = candidate
-                            }
-                            if (line.isNotEmpty() && y < edited.height - 12f) editCanvas.drawText(line, edited.width * 0.05f, y, labelPaint)
-                        }
-                        if (photoBrandWatermark) {
-                            labelPaint.color = android.graphics.Color.rgb(19, 189, 235)
-                            labelPaint.textSize = (edited.width * 0.032f).coerceIn(18f, 42f)
-                            editCanvas.drawText("INFO KINI • infokini.news", edited.width * 0.05f, edited.height - edited.height * 0.035f, labelPaint)
-                        }
-                    }
-                    if (rotated !== source) rotated.recycle()
-                    val stream = context.contentResolver.openOutputStream(outputUri)
-                        ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka")
-                    stream.use {
-                        if (!edited.compress(Bitmap.CompressFormat.JPEG, 92, it)) {
-                            throw IllegalStateException("Foto gagal disimpan")
-                        }
-                    }
-                    source.recycle()
-                    edited.recycle()
-                    Toast.makeText(context, "Foto hasil edit berhasil disimpan", Toast.LENGTH_LONG).show()
-                } catch (error: Exception) {
-                    Toast.makeText(context, "Edit foto gagal: ${error.message ?: "kesalahan file"}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-    MaterialTheme(colorScheme = darkColorScheme(
-        primary = Cyan, secondary = Cyan, background = Color(0xFF080D4A),
-        surface = Color(0xFF111A35), onSurface = Color.White
-    )) {
-        Column(
-            Modifier.fillMaxSize().background(Navy).verticalScroll(screenScrollState).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("InfoKini", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
-                    Text("NEWS STUDIO  •  infokini.news", color = Cyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-                Surface(color = if (live) Color.Red else Color(0xFF26334F), shape = RoundedCornerShape(20.dp)) {
-                    Text(if (live) "● LIVE" else "STUDIO", Modifier.padding(horizontal = 14.dp, vertical = 8.dp), color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !footballMode && !sportsNewsMode, onClick = { footballMode = false; sportsNewsMode = false }, label = { Text("Studio Berita") })
-                FilterChip(selected = footballMode, onClick = { footballMode = true; sportsNewsMode = false }, label = { Text("Skor Bola") })
-                FilterChip(selected = sportsNewsMode, onClick = { sportsNewsMode = true; footballMode = false }, label = { Text("Berita Olahraga") })
-            }
-            Text("MENU FITUR • VERSI 2.5", color = Color(0xFFB8C4D9), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("VIDEO", fontSize = 10.sp) }
-                OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(reporterSectionY.coerceAtLeast(0)) } }, modifier = Modifier.weight(1f)) { Text("AI REPORTER", fontSize = 10.sp) }
-                OutlinedButton(onClick = { footballMode = false; sportsNewsMode = false; picker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) { Text("FOTO", fontSize = 10.sp) }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = { sportsNewsMode = true; footballMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("BERITA OLAHRAGA", fontSize = 10.sp) }
-                OutlinedButton(onClick = { footballMode = true; sportsNewsMode = false; screenScope.launch { screenScrollState.animateScrollTo(0) } }, modifier = Modifier.weight(1f)) { Text("GRAFIS SKOR", fontSize = 10.sp) }
-            }
-            Text("PRATINJAU SIARAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Column(
-                Modifier.fillMaxWidth().height(220.dp).background(Color(0xFF101827), RoundedCornerShape(12.dp))
-                    .border(1.dp, Cyan.copy(alpha = .55f), RoundedCornerShape(12.dp)).padding(12.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Text("infokini.news", color = Color.White, fontWeight = FontWeight.Black,
-                        modifier = Modifier.background(Navy.copy(alpha = .85f), RoundedCornerShape(4.dp)).padding(7.dp))
-                }
-                Spacer(Modifier.weight(1f))
-                if (footballMode) {
-                    Column(Modifier.fillMaxWidth().background(Color(0xFF07152B), RoundedCornerShape(8.dp)).padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            if (competitionLogoUri != null) {
-                                AndroidView(factory = { ImageView(it).apply { setImageURI(competitionLogoUri); scaleType = ImageView.ScaleType.FIT_CENTER } },
-                                    update = { it.setImageURI(competitionLogoUri) }, modifier = Modifier.size(28.dp))
-                            }
-                            Text(competition.ifBlank { "NAMA KOMPETISI" }, color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceEvenly) {
-                            if (homeLogoUri != null) AndroidView(factory = { ImageView(it).apply { setImageURI(homeLogoUri); scaleType = ImageView.ScaleType.FIT_CENTER } },
-                                update = { it.setImageURI(homeLogoUri) }, modifier = Modifier.size(34.dp))
-                            Text(homeTeam.ifBlank { "TIM A" }, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            Text("$homeScore - $awayScore", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
-                            Text(awayTeam.ifBlank { "TIM B" }, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            if (awayLogoUri != null) AndroidView(factory = { ImageView(it).apply { setImageURI(awayLogoUri); scaleType = ImageView.ScaleType.FIT_CENTER } },
-                                update = { it.setImageURI(awayLogoUri) }, modifier = Modifier.size(34.dp))
-                        }
-                        Text("$matchTime  •  $matchStatus", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("KUNING $homeYellowCards | MERAH $homeRedCards     KUNING $awayYellowCards | MERAH $awayRedCards", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        if (matchEvents.isNotBlank()) Text(matchEvents, color = Color.White, fontSize = 9.sp, maxLines = 1)
-                    }
-                } else if (headline.isNotBlank()) {
-                    Column(Modifier.fillMaxWidth().background(Navy.copy(alpha = .92f)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(headline, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        if (location.isNotBlank()) Text(location, color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                Row(Modifier.fillMaxWidth().background(Cyan).padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("INFO KINI", color = Navy, fontWeight = FontWeight.Black, fontSize = 11.sp)
-                    Spacer(Modifier.width(10.dp))
-                    Text(ticker.ifBlank { " " }, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
-                }
-            }
-
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("MODE SIARAN SEPAK BOLA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("Aktifkan hanya saat menayangkan pertandingan", color = Color.LightGray, fontSize = 11.sp)
-                }
-                Switch(checked = footballMode, onCheckedChange = { footballMode = it })
-            }
-            if (footballMode) {
-                Text("PENGATURAN SKOR PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Box {
-                    OutlinedButton(onClick = { sportTypeMenu = true }, modifier = Modifier.fillMaxWidth()) { Text("Cabang olahraga: $sportType") }
-                    DropdownMenu(expanded = sportTypeMenu, onDismissRequest = { sportTypeMenu = false }) {
-                        listOf("Sepak Bola", "Futsal", "Basket", "Bulu Tangkis", "Voli", "Balap").forEach { type ->
-                            DropdownMenuItem(text = { Text(type) }, onClick = { sportType = type; sportTypeMenu = false })
-                        }
-                    }
-                }
-                StudioField("Babak / pekan", matchRound, { matchRound = it }, "Contoh: Final / Pekan 12")
-                StudioField("Lokasi pertandingan", matchVenue, { matchVenue = it }, "Stadion / arena")
-                StudioField("Wasit / ofisial (opsional)", matchReferee, { matchReferee = it }, "Nama ofisial")
-                StudioField("Kompetisi / nama pertandingan", competition, { competition = it }, "Contoh: Liga 1 Indonesia")
-                StudioField("Nama tim kandang", homeTeam, { homeTeam = it }, "Nama tim A")
-                StudioField("Skor tim kandang", homeScore, { homeScore = it.filter { ch -> ch.isDigit() }.take(2) }, "0")
-                StudioField("Nama tim tandang", awayTeam, { awayTeam = it }, "Nama tim B")
-                StudioField("Skor tim tandang", awayScore, { awayScore = it.filter { ch -> ch.isDigit() }.take(2) }, "0")
-                Text("JAM PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text(matchTime, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { matchClockRunning = !matchClockRunning }, modifier = Modifier.weight(1f)) {
-                        Text(if (matchClockRunning) "JEDA JAM" else "MULAI JAM")
-                    }
-                    OutlinedButton(onClick = {
-                        matchClockRunning = false
-                        matchElapsedSeconds = 0
-                        matchTime = "00:00"
-                    }, modifier = Modifier.weight(1f)) { Text("RESET") }
-                }
-                StudioField("Koreksi waktu / tambahan", matchTime, { matchTime = it }, "Contoh: 45+2'")
-                var expandedStatus by remember { mutableStateOf(false) }
-                Box {
-                    OutlinedButton(onClick = { expandedStatus = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text(matchStatus, color = Cyan)
-                    }
-                    DropdownMenu(expanded = expandedStatus, onDismissRequest = { expandedStatus = false }) {
-                        listOf("BELUM DIMULAI", "BABAK PERTAMA", "ISTIRAHAT", "BABAK KEDUA", "TAMBAHAN WAKTU", "ADU PENALTI", "SELESAI").forEach { status ->
-                            DropdownMenuItem(text = { Text(status) }, onClick = { matchStatus = status; expandedStatus = false })
-                        }
-                    }
-                }
-                Text("LOGO PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(onClick = { competitionLogoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) { Text("Logo kompetisi") }
-                    OutlinedButton(onClick = { homeLogoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) { Text("Logo tim A") }
-                    OutlinedButton(onClick = { awayLogoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) { Text("Logo tim B") }
-                }
-                Text("KARTU PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(homeTeam.ifBlank { "Tim kandang" }, color = Color.White, fontSize = 11.sp)
-                        Text("Kuning: $homeYellowCards  Merah: $homeRedCards", color = Color.LightGray, fontSize = 10.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            OutlinedButton(onClick = { homeYellowCards = (homeYellowCards + 1).coerceAtMost(9) }, modifier = Modifier.weight(1f)) { Text("+ Kuning") }
-                            OutlinedButton(onClick = { homeRedCards = (homeRedCards + 1).coerceAtMost(9) }, modifier = Modifier.weight(1f)) { Text("+ Merah") }
-                        }
-                    }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(awayTeam.ifBlank { "Tim tandang" }, color = Color.White, fontSize = 11.sp)
-                        Text("Kuning: $awayYellowCards  Merah: $awayRedCards", color = Color.LightGray, fontSize = 10.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            OutlinedButton(onClick = { awayYellowCards = (awayYellowCards + 1).coerceAtMost(9) }, modifier = Modifier.weight(1f)) { Text("+ Kuning") }
-                            OutlinedButton(onClick = { awayRedCards = (awayRedCards + 1).coerceAtMost(9) }, modifier = Modifier.weight(1f)) { Text("+ Merah") }
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { homeYellowCards = (homeYellowCards - 1).coerceAtLeast(0); homeRedCards = (homeRedCards - 1).coerceAtLeast(0) }, modifier = Modifier.weight(1f)) { Text("Koreksi kandang") }
-                    OutlinedButton(onClick = { awayYellowCards = (awayYellowCards - 1).coerceAtLeast(0); awayRedCards = (awayRedCards - 1).coerceAtLeast(0) }, modifier = Modifier.weight(1f)) { Text("Koreksi tandang") }
-                }
-                StudioField("Catatan kejadian (gol / pergantian)", matchEvents, { matchEvents = it }, "Contoh: 32' Gol Tim A • 60' Pergantian pemain")
-                Button(onClick = { matchGraphicExporter.launch("infokini-skor-pertandingan.png") }, modifier = Modifier.fillMaxWidth()) {
-                    Text("EKSPOR GRAFIS PERTANDINGAN PNG")
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        val prefs = context.getSharedPreferences("infokini_match", 0)
-                        prefs.edit()
-                            .putString("competition", competition)
-                            .putString("homeLogoUri", homeLogoUri?.toString())
-                            .putString("awayLogoUri", awayLogoUri?.toString())
-                            .putString("competitionLogoUri", competitionLogoUri?.toString())
-                            .putString("homeTeam", homeTeam).putString("awayTeam", awayTeam)
-                            .putString("homeScore", homeScore).putString("awayScore", awayScore)
-                            .putString("matchTime", matchTime).putString("matchStatus", matchStatus)
-                            .putInt("elapsed", matchElapsedSeconds)
-                            .putInt("homeYellow", homeYellowCards).putInt("awayYellow", awayYellowCards)
-                            .putInt("homeRed", homeRedCards).putInt("awayRed", awayRedCards)
-                            .putString("events", matchEvents)
-                            .putString("sportType", sportType).putString("matchRound", matchRound)
-                            .putString("matchVenue", matchVenue).putString("matchReferee", matchReferee).apply()
-                        Toast.makeText(context, "Data pertandingan tersimpan", Toast.LENGTH_SHORT).show()
-                    }, modifier = Modifier.weight(1f)) { Text("Simpan laga") }
-                    OutlinedButton(onClick = {
-                        val prefs = context.getSharedPreferences("infokini_match", 0)
-                        competition = prefs.getString("competition", "").orEmpty()
-                        homeLogoUri = prefs.getString("homeLogoUri", null)?.let { Uri.parse(it) }
-                        awayLogoUri = prefs.getString("awayLogoUri", null)?.let { Uri.parse(it) }
-                        competitionLogoUri = prefs.getString("competitionLogoUri", null)?.let { Uri.parse(it) }
-                        homeTeam = prefs.getString("homeTeam", "").orEmpty()
-                        awayTeam = prefs.getString("awayTeam", "").orEmpty()
-                        homeScore = prefs.getString("homeScore", "0") ?: "0"
-                        awayScore = prefs.getString("awayScore", "0") ?: "0"
-                        matchTime = prefs.getString("matchTime", "00:00") ?: "00:00"
-                        matchStatus = prefs.getString("matchStatus", "BELUM DIMULAI") ?: "BELUM DIMULAI"
-                        matchElapsedSeconds = prefs.getInt("elapsed", 0)
-                        homeYellowCards = prefs.getInt("homeYellow", 0)
-                        awayYellowCards = prefs.getInt("awayYellow", 0)
-                        homeRedCards = prefs.getInt("homeRed", 0)
-                        awayRedCards = prefs.getInt("awayRed", 0)
-                        matchEvents = prefs.getString("events", "").orEmpty()
-                        sportType = prefs.getString("sportType", "Sepak Bola") ?: "Sepak Bola"
-                        matchRound = prefs.getString("matchRound", "").orEmpty()
-                        matchVenue = prefs.getString("matchVenue", "").orEmpty()
-                        matchReferee = prefs.getString("matchReferee", "").orEmpty()
-                        matchClockRunning = false
-                        Toast.makeText(context, "Data pertandingan dimuat", Toast.LENGTH_SHORT).show()
-                    }, modifier = Modifier.weight(1f)) { Text("Muat laga") }
-                }
-                Text("Logo tim dan logo kompetisi serta timer otomatis masih memerlukan pengembangan lanjutan.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            } else if (sportsNewsMode) {
-                SportsNewsEditor()
-            } else {
-            Text("STUDIO VIDEO BERITA MANUAL", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Pilih desain siap pakai, isi judul dan teks berjalan, tambahkan media, lalu ekspor video. Studio manual dapat digunakan tanpa AI Reporter.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            Text("PROYEK VIDEO", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-            StudioField("Nama proyek", projectName, { projectName = it }, "Contoh: Liputan kegiatan desa...")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
-                    val prefs = context.getSharedPreferences("infokini_video_projects", 0)
-                    val safeName = projectName.trim().ifBlank { "Proyek berita baru" }
-                    val projectKey = "project_" + Uri.encode(safeName)
-                    prefs.edit()
-                        .putString("${projectKey}_project_name", safeName)
-                        .putString("${projectKey}_headline", headline)
-                        .putString("${projectKey}_ticker", ticker)
-                        .putString("${projectKey}_caption", videoCaption)
-                        .putString("${projectKey}_location", location)
-                        .putString("${projectKey}_template", selectedNewsTemplate)
-                        .putString("${projectKey}_aspect", selectedAspectRatio)
-                        .putString("${projectKey}_media_uri", selectedMedia?.toString().orEmpty())
-                        .putString("${projectKey}_media_label", mediaLabel)
-                        .putString("${projectKey}_extra_video_uris", additionalVideoUris.joinToString("|") { it.toString() })
-                        .putString("${projectKey}_clip_trims", JSONObject().apply {
-                            clipTrimPercentages.forEach { (uri, range) -> put(uri, "${range.first},${range.second}") }
-                        }.toString())
-                        .putString("${projectKey}_music_uri", backgroundMusicUri?.toString().orEmpty())
-                        .putString("${projectKey}_music_label", backgroundMusicLabel)
-                        .putBoolean("${projectKey}_music_enabled", backgroundMusicEnabled)
-                        .putString("${projectKey}_music_theme", selectedMusicTheme)
-                        .putFloat("${projectKey}_trim_start", videoStartMs)
-                        .putFloat("${projectKey}_trim_end", videoEndMs)
-                        .putString("${projectKey}_reporter_topic", reporterTopic)
-                        .putString("${projectKey}_reporter_source", reporterSourceUrl)
-                        .putString("${projectKey}_reporter_comparison", reporterComparisonSourceUrl)
-                        .putString("${projectKey}_reporter_facts", reporterFacts)
-                        .putString("${projectKey}_reporter_script", reporterVideoScript)
-                        .putBoolean("${projectKey}_reporter_material_applied", reporterMaterialAppliedToVideo)
-                        .putFloat("${projectKey}_photo_brightness", photoBrightness)
-                        .putFloat("${projectKey}_photo_contrast", photoContrast)
-                        .putFloat("${projectKey}_photo_saturation", photoSaturation)
-                        .putFloat("${projectKey}_photo_rotation", photoRotation)
-                        .putBoolean("${projectKey}_photo_flip_h", photoFlipHorizontal)
-                        .putBoolean("${projectKey}_photo_flip_v", photoFlipVertical)
-                        .putString("${projectKey}_photo_caption", photoCaption)
-                        .putBoolean("${projectKey}_photo_watermark", photoBrandWatermark)
-                        .putString("${projectKey}_presenter_style", presenterStyle)
-                        .putString("${projectKey}_delivery_style", deliveryStyle)
-                        .putString("${projectKey}_tts_voice", selectedTtsVoice)
-                        .putLong("${projectKey}_saved_at", System.currentTimeMillis())
-                        .putStringSet("project_names", (savedProjectNames + safeName).toSet())
-                        .apply()
-                    savedProjectNames = (savedProjectNames + safeName).distinct().sorted()
-                    projectName = safeName
-                    Toast.makeText(context, "Proyek '$safeName' tersimpan. Total: ${savedProjectNames.size}", Toast.LENGTH_SHORT).show()
-                }, modifier = Modifier.weight(1f)) { Text("Simpan proyek") }
-                Box(Modifier.weight(1f)) {
-                    OutlinedButton(onClick = {
-                        val prefs = context.getSharedPreferences("infokini_video_projects", 0)
-                        savedProjectNames = prefs.getStringSet("project_names", emptySet())?.toList()?.sorted().orEmpty()
-                        if (savedProjectNames.isEmpty()) Toast.makeText(context, "Belum ada proyek tersimpan", Toast.LENGTH_SHORT).show()
-                        else projectMenuExpanded = true
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Muat proyek") }
-                    DropdownMenu(expanded = projectMenuExpanded, onDismissRequest = { projectMenuExpanded = false }) {
-                        savedProjectNames.forEach { savedName ->
-                            DropdownMenuItem(text = { Text(savedName) }, onClick = {
-                                val prefs = context.getSharedPreferences("infokini_video_projects", 0)
-                                val key = "project_" + Uri.encode(savedName)
-                                projectName = prefs.getString("${key}_project_name", savedName).orEmpty()
-                                headline = prefs.getString("${key}_headline", "").orEmpty()
-                                ticker = prefs.getString("${key}_ticker", "").orEmpty()
-                                videoCaption = prefs.getString("${key}_caption", "").orEmpty()
-                                location = prefs.getString("${key}_location", "").orEmpty()
-                                selectedNewsTemplate = prefs.getString("${key}_template", "Berita Umum").orEmpty()
-                                selectedAspectRatio = prefs.getString("${key}_aspect", "16:9 • YouTube / TV").orEmpty()
-                                selectedMedia = prefs.getString("${key}_media_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
-                                mediaLabel = prefs.getString("${key}_media_label", "Belum ada media dipilih").orEmpty()
-                                additionalVideoUris = prefs.getString("${key}_extra_video_uris", "").orEmpty().split("|").filter { it.isNotBlank() }.mapNotNull { raw -> runCatching { Uri.parse(raw) }.getOrNull() }
-                                clipTrimPercentages = runCatching {
-                                    val json = JSONObject(prefs.getString("${key}_clip_trims", "{}").orEmpty())
-                                    buildMap {
-                                        val keys = json.keys()
-                                        while (keys.hasNext()) {
-                                            val uri = keys.next()
-                                            val values = json.optString(uri).split(",")
-                                            if (values.size == 2) put(uri, values[0].toFloat() to values[1].toFloat())
-                                        }
-                                    }
-                                }.getOrDefault(emptyMap())
-                                backgroundMusicUri = prefs.getString("${key}_music_uri", "").orEmpty().takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
-                                backgroundMusicLabel = prefs.getString("${key}_music_label", "Belum ada musik dipilih").orEmpty()
-                                backgroundMusicEnabled = prefs.getBoolean("${key}_music_enabled", true)
-                                selectedMusicTheme = prefs.getString("${key}_music_theme", "InfoKini News Theme").orEmpty()
-                                videoStartMs = prefs.getFloat("${key}_trim_start", 0f)
-                                videoEndMs = prefs.getFloat("${key}_trim_end", 0f)
-                                videoDurationMs = 0L
-                                val restoredMedia = selectedMedia
-                                if (restoredMedia != null && context.contentResolver.getType(restoredMedia)?.startsWith("video/") == true) {
-                                    try {
-                                        val metadata = MediaMetadataRetriever()
-                                        metadata.setDataSource(context, restoredMedia)
-                                        videoDurationMs = metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                                        metadata.release()
-                                        videoStartMs = videoStartMs.coerceIn(0f, videoDurationMs.toFloat())
-                                        videoEndMs = videoEndMs.coerceIn(videoStartMs, videoDurationMs.toFloat())
-                                    } catch (_: Exception) {
-                                        Toast.makeText(context, "Media proyek tidak dapat diakses. Pilih ulang videonya.", Toast.LENGTH_LONG).show()
-                                        selectedMedia = null
-                                        mediaLabel = "Media perlu dipilih ulang"
-                                    }
-                                }
-                                reporterTopic = prefs.getString("${key}_reporter_topic", "").orEmpty()
-                                reporterSourceUrl = prefs.getString("${key}_reporter_source", "").orEmpty()
-                                reporterComparisonSourceUrl = prefs.getString("${key}_reporter_comparison", "").orEmpty()
-                                reporterFacts = prefs.getString("${key}_reporter_facts", "").orEmpty()
-                                reporterVideoScript = prefs.getString("${key}_reporter_script", "").orEmpty()
-                                reporterVerified = false
-                                reporterApproved = false
-                                reporterMaterialAppliedToVideo = prefs.getBoolean("${key}_reporter_material_applied", false)
-                                photoBrightness = prefs.getFloat("${key}_photo_brightness", 0f)
-                                photoContrast = prefs.getFloat("${key}_photo_contrast", 1f)
-                                photoSaturation = prefs.getFloat("${key}_photo_saturation", 1f)
-                                photoRotation = prefs.getFloat("${key}_photo_rotation", 0f)
-                                photoFlipHorizontal = prefs.getBoolean("${key}_photo_flip_h", false)
-                                photoFlipVertical = prefs.getBoolean("${key}_photo_flip_v", false)
-                                photoCaption = prefs.getString("${key}_photo_caption", "").orEmpty()
-                                photoBrandWatermark = prefs.getBoolean("${key}_photo_watermark", true)
-                                presenterStyle = prefs.getString("${key}_presenter_style", "Presenter Pria").orEmpty()
-                                deliveryStyle = prefs.getString("${key}_delivery_style", "Formal / Berita").orEmpty()
-                                selectedTtsVoice = prefs.getString("${key}_tts_voice", "Default Android").orEmpty()
-                                projectMenuExpanded = false
-                                Toast.makeText(context, "Proyek dimuat. Verifikasi dan persetujuan redaksi harus dilakukan ulang.", Toast.LENGTH_LONG).show()
-                            })
-                            DropdownMenuItem(text = { Text("Hapus proyek: $savedName", color = Color(0xFFD65A5A)) }, onClick = {
-                                projectPendingDelete = savedName
-                                projectMenuExpanded = false
-                            })
-                        }
-                    }
-                }
-            }
-            projectPendingDelete?.let { nameToDelete ->
-                AlertDialog(
-                    onDismissRequest = { projectPendingDelete = null },
-                    title = { Text("Hapus proyek?") },
-                    text = { Text("Proyek '$nameToDelete' akan dihapus dari penyimpanan aplikasi.") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            val prefs = context.getSharedPreferences("infokini_video_projects", 0)
-                            val keyPrefix = "project_" + Uri.encode(nameToDelete) + "_"
-                            val editor = prefs.edit()
-                            prefs.all.keys.filter { it.startsWith(keyPrefix) }.forEach { editor.remove(it) }
-                            val remaining = savedProjectNames.filterNot { it == nameToDelete }.toSet()
-                            editor.putStringSet("project_names", remaining).apply()
-                            savedProjectNames = remaining.toList().sorted()
-                            projectPendingDelete = null
-                            Toast.makeText(context, "Proyek dihapus", Toast.LENGTH_SHORT).show()
-                        }) { Text("Hapus") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { projectPendingDelete = null }) { Text("Batal") }
-                    }
-                )
-            }
-            Text("GALERI TEMPLATE INFOKINI", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text("Pilih desain berita dari galeri. Template aktif digunakan pada proses video.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                newsTemplates.chunked(2).forEach { templateRow ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        templateRow.forEach { template ->
-                            val chosen = selectedNewsTemplate == template
-                            val base = Color(newsTemplatePalette(template).first)
-                            Surface(
-                                modifier = Modifier.weight(1f),
-                                onClick = { selectedNewsTemplate = template },
-                                color = if (chosen) Color(0xFF183A59) else Color(0xFF101936),
-                                shape = RoundedCornerShape(12.dp),
-                                border = androidx.compose.foundation.BorderStroke(if (chosen) 2.dp else 1.dp, if (chosen) Cyan else Color(0xFF34415F))
-                            ) {
-                                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                    Column(
-                                        Modifier.fillMaxWidth().height(92.dp).background(base, RoundedCornerShape(7.dp)).padding(6.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("INFOKINI.NEWS", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black)
-                                            Text(if (template == "Breaking News") "LIVE" else "INFO", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        Box(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF263653), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
-                                            Text(
-                                                when (template) {
-                                                    "Liputan Desa" -> "LIPUTAN LAPANGAN"
-                                                    "Wawancara" -> "NARASUMBER"
-                                                    "Olahraga" -> "SKOR • OLAHRAGA"
-                                                    "Info Cuaca" -> "INFO CUACA"
-                                                    "Ekonomi / UMKM" -> "EKONOMI & UMKM"
-                                                    "Vertikal Sosial Media" -> "VIDEO VERTIKAL"
-                                                    "Kriminal" -> "KABAR TERKINI"
-                                                    "Dokumenter" -> "DOKUMENTER"
-                                                    else -> "VISUAL BERITA"
-                                                },
-                                                color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Box(Modifier.fillMaxWidth(0.88f).height(5.dp).background(Color.White, RoundedCornerShape(2.dp)))
-                                        Box(Modifier.fillMaxWidth(0.58f).height(4.dp).background(Cyan, RoundedCornerShape(2.dp)))
-                                        Box(Modifier.fillMaxWidth().height(7.dp).background(Color(0xFF080D25), RoundedCornerShape(2.dp)), contentAlignment = Alignment.CenterStart) {
-                                            Text("INFO TERKINI • INFOKINI.NEWS", color = Color.White, fontSize = 5.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Text(template, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                                    Text(if (chosen) "✓ DIPILIH" else "Gunakan template", color = if (chosen) Cyan else Color(0xFFB8C4D9), fontSize = 9.sp)
-                                }
-                            }
-                        }
-                        if (templateRow.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
-            }
-            Text("Template aktif: $selectedNewsTemplate", color = Cyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text("FORMAT VIDEO", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-            Box {
-                OutlinedButton(onClick = { aspectMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(selectedAspectRatio)
-                }
-                DropdownMenu(expanded = aspectMenu, onDismissRequest = { aspectMenu = false }) {
-                    listOf("16:9 • YouTube / TV", "9:16 • TikTok / Reels / Shorts", "1:1 • Feed Instagram / Facebook").forEach { ratio ->
-                        DropdownMenuItem(text = { Text(ratio) }, onClick = {
-                            selectedAspectRatio = ratio
-                            aspectMenu = false
-                        })
-                    }
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
-                    context.getSharedPreferences("infokini_templates", 0).edit()
-                        .putString("template", selectedNewsTemplate)
-                        .putString("aspect", selectedAspectRatio).apply()
-                    Toast.makeText(context, "Template favorit tersimpan", Toast.LENGTH_SHORT).show()
-                }, modifier = Modifier.weight(1f)) { Text("Simpan template") }
-                OutlinedButton(onClick = {
-                    val prefs = context.getSharedPreferences("infokini_templates", 0)
-                    selectedNewsTemplate = prefs.getString("template", "Berita Umum") ?: "Berita Umum"
-                    selectedAspectRatio = prefs.getString("aspect", "16:9 • YouTube / TV") ?: "16:9 • YouTube / TV"
-                    Toast.makeText(context, "Template favorit dimuat", Toast.LENGTH_SHORT).show()
-                }, modifier = Modifier.weight(1f)) { Text("Muat template") }
-            }
-            Text("EDITOR BERITA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            StudioField("Judul berita", headline, { headline = it }, "Tulis judul berita...")
-            StudioField("Teks berjalan", ticker, { ticker = it }, "Tulis running text...")
-            StudioField("Caption / teks narasi di video", videoCaption, { videoCaption = it }, "Tulis keterangan singkat yang tampil pada video...")
-            StudioField("Lokasi berita", location, { location = it }, "Contoh: Cigombong, Kabupaten Bogor")
-            }
-            Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.onGloballyPositioned { reporterSectionY = it.positionInParent().y.toInt() })
-            Text("Alur kerja redaksi: cari dan telusuri sumber, catat fakta, verifikasi silang, susun naskah video orisinal, lalu minta persetujuan redaksi. Saat ini aplikasi menyediakan alur input dan pemeriksaan manual; pemantauan otomatis lintas platform, rangkuman otomatis, dan pembuatan video AI penuh belum aktif karena membutuhkan API resmi serta backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            StudioField("Alamat Backend AI (HTTPS)", aiBackendUrl, { aiBackendUrl = it.trim(); context.getSharedPreferences("infokini_ai", 0).edit().putString("backend_url", it.trim()).apply() }, "https://alamat-server-anda.example")
-            Text(aiBackendStatus, color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            if (aiVerificationNotes.isNotBlank()) Text("CATATAN PEMERIKSAAN AI: $aiVerificationNotes", color = Color(0xFFFFD27A), fontSize = 11.sp)
-            StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Contoh: banjir, kebijakan publik, olahraga...")
-            Text("PENCARIAN BERITA OTOMATIS • GOOGLE NEWS RSS", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Text("Mengambil judul, waktu terbit, dan tautan berita terbaru berdasarkan topik. Ini pencarian RSS otomatis, bukan pemantauan semua platform atau verifikasi fakta otomatis.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            Button(onClick = {
-                if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                else screenScope.launch {
-                    rssLoading = true
-                    rssError = ""
-                    try {
-                        rssNewsItems = fetchGoogleNewsRss(reporterTopic)
-                        if (rssNewsItems.isEmpty()) rssError = "Belum ada hasil. Coba kata kunci lain."
-                    } catch (_: Exception) {
-                        rssError = "Pencarian gagal. Periksa koneksi internet lalu coba lagi."
-                    } finally { rssLoading = false }
-                }
-            }, enabled = !rssLoading, modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
-            ) { Text(if (rssLoading) "MENCARI BERITA..." else "CARI BERITA TERKINI OTOMATIS", fontWeight = FontWeight.Black) }
-            if (rssError.isNotBlank()) Text(rssError, color = Color(0xFFFFB4AB), fontSize = 11.sp)
-            rssNewsItems.forEach { item ->
-                Column(Modifier.fillMaxWidth().background(Color(0xFF17243A), RoundedCornerShape(8.dp)).padding(9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(item.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                    Text(item.published, color = Cyan, fontSize = 10.sp)
-                    Text(item.source, color = Color.LightGray, fontSize = 10.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            reporterSourceUrl = item.link
-                            headline = item.title.take(100)
-                            reporterApproved = false
-                            openReporterSource(context, item.link)
-                        }) { Text("BUKA SUMBER") }
-                        TextButton(onClick = {
-                            reporterSourceUrl = item.link
-                            headline = item.title.take(100)
-                            reporterTopic = item.title
-                            reporterApproved = false
-                            Toast.makeText(context, "Judul dan tautan dimasukkan ke formulir redaksi", Toast.LENGTH_SHORT).show()
-                        }) { Text("GUNAKAN TOPIK") }
-                    }
-                }
-            }
-            Text("PENELUSURAN SUMBER PUBLIK", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-            Text("Pilih platform untuk mencari laporan terkait topik. Hasil pencarian bukan bukti kebenaran; redaksi tetap wajib membuka sumber, memeriksa tanggal, membandingkan laporan, dan mengonfirmasi fakta.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            val encodedReporterQuery = Uri.encode(reporterTopic)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://news.google.com/search?q=$encodedReporterQuery")))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Google News") }
-                OutlinedButton(
-                    onClick = {
-                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.bing.com/news/search?q=$encodedReporterQuery")))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Bing News") }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=$encodedReporterQuery")))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("YouTube") }
-                OutlinedButton(
-                    onClick = {
-                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com/search?q=$encodedReporterQuery")))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("TikTok") }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://x.com/search?q=$encodedReporterQuery")))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("X / Twitter") }
-                OutlinedButton(
-                    onClick = {
-                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode("site:instagram.com $reporterTopic"))))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Instagram") }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.reddit.com/search/?q=$encodedReporterQuery")))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Reddit") }
-                OutlinedButton(
-                    onClick = {
-                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://trends.google.com/trends/explore?q=$encodedReporterQuery&geo=ID")))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Google Trends") }
-            }
-            OutlinedButton(
-                onClick = {
-                    if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                    else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/search/posts/?q=$encodedReporterQuery")))
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Cari unggahan publik Facebook") }
-            OutlinedButton(
-                onClick = {
-                    if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                    else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$encodedReporterQuery")))
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Cari di Google Web") }
-            StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL sumber pertama (https://...)...")
-            StudioField("Tautan sumber pembanding", reporterComparisonSourceUrl, { reporterComparisonSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL sumber independen kedua...")
-            Text("Persetujuan mensyaratkan dua URL valid dari domain berbeda dan catatan fakta. Domain berbeda hanya pemeriksaan awal; redaksi tetap wajib memastikan penerbit benar-benar independen, bukan salinan/sindikasi, serta isi kedua sumber mendukung fakta.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            StudioField("Fakta dan hasil konfirmasi", reporterFacts, { reporterFacts = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Catat siapa, apa, kapan, di mana, bukti, dan tanggapan...")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = reporterVerified, onCheckedChange = { reporterVerified = it; reporterApproved = false; reporterMaterialAppliedToVideo = false })
-                Text("Sudah diverifikasi dan dikonfirmasi redaksi", color = Color.White, fontSize = 12.sp)
-            }
-            StudioField("Naskah narasi video (bukan artikel)", reporterVideoScript, { reporterVideoScript = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tulis kalimat yang akan dibacakan presenter/narator...")
-            Button(onClick = {
-                if (aiBackendUrl.isBlank() || !isValidHttpsUrl(aiBackendUrl)) {
-                    aiBackendStatus = "Masukkan alamat backend HTTPS yang sudah dipasang terlebih dahulu."
-                    Toast.makeText(context, aiBackendStatus, Toast.LENGTH_LONG).show()
-                } else if (reporterTopic.isBlank() || reporterFacts.isBlank()) {
-                    Toast.makeText(context, "Isi topik dan fakta/hasil konfirmasi terlebih dahulu.", Toast.LENGTH_LONG).show()
-                } else {
-                    screenScope.launch {
-                        aiGenerating = true
-                        aiBackendStatus = "Menghubungi backend AI..."
-                        reporterApproved = false
-                        reporterMaterialAppliedToVideo = false
-                        try {
-                            val generated = generateNewsScriptWithBackend(aiBackendUrl, reporterTopic, reporterFacts, reporterSourceUrl, reporterComparisonSourceUrl)
-                            headline = generated.optString("headline", headline)
-                            ticker = generated.optString("ticker", ticker)
-                            reporterVideoScript = generated.optString("script", reporterVideoScript)
-                            aiVerificationNotes = generated.optString("verification_notes", "")
-                            aiBackendStatus = "Draf AI dibuat. Periksa fakta dan sumber; AI tidak menggantikan verifikasi redaksi."
-                        } catch (error: Exception) {
-                            aiBackendStatus = "Gagal: " + (error.message ?: "backend tidak dapat dihubungi")
-                        } finally { aiGenerating = false }
-                    }
-                }
-            }, enabled = !aiGenerating, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)) {
-                Text(if (aiGenerating) "AI SEDANG MENYUSUN NASKAH..." else "BUAT NASKAH VIDEO DENGAN AI", fontWeight = FontWeight.Black)
-            }
-            if (isValidHttpUrl(reporterSourceUrl)) {
-                OutlinedButton(onClick = { openReporterSource(context, reporterSourceUrl) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("BUKA SUMBER UTAMA")
-                }
-            }
-            if (isValidHttpUrl(reporterComparisonSourceUrl)) {
-                OutlinedButton(onClick = { openReporterSource(context, reporterComparisonSourceUrl) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("BUKA SUMBER PEMBANDING")
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = reporterApproved, onCheckedChange = { checked ->
-                    reporterApproved = checked && reporterVerified && reporterTopic.isNotBlank() && reporterFacts.isNotBlank() && isValidIndependentSourcePair(reporterSourceUrl, reporterComparisonSourceUrl) && reporterVideoScript.isNotBlank()
-                    if (checked && !reporterApproved) Toast.makeText(context, "Persetujuan memerlukan topik, fakta, dua domain sumber berbeda, verifikasi redaksi, dan naskah video.", Toast.LENGTH_LONG).show()
-                })
-                Text("Disetujui redaksi untuk diterbitkan / diekspor", color = Color.White, fontSize = 12.sp)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
-                    context.getSharedPreferences("infokini_reporter_draft", 0).edit()
-                        .putString("topic", reporterTopic)
-                        .putString("source", reporterSourceUrl)
-                        .putString("comparison_source", reporterComparisonSourceUrl)
-                        .putString("facts", reporterFacts)
-                        .putString("script", reporterVideoScript)
-                        .putBoolean("verified", reporterVerified)
-                        .putBoolean("approved", reporterApproved)
-                        .apply()
-                    Toast.makeText(context, "Draf AI Reporter tersimpan di perangkat", Toast.LENGTH_SHORT).show()
-                }, modifier = Modifier.weight(1f)) { Text("SIMPAN DRAF REPORTER") }
-                OutlinedButton(onClick = {
-                    val prefs = context.getSharedPreferences("infokini_reporter_draft", 0)
-                    reporterTopic = prefs.getString("topic", "").orEmpty()
-                    reporterSourceUrl = prefs.getString("source", "").orEmpty()
-                    reporterComparisonSourceUrl = prefs.getString("comparison_source", "").orEmpty()
-                    reporterFacts = prefs.getString("facts", "").orEmpty()
-                    reporterVideoScript = prefs.getString("script", "").orEmpty()
-                    reporterVerified = prefs.getBoolean("verified", false)
-                    // Persetujuan tidak dipulihkan otomatis agar draf yang dimuat harus ditinjau ulang.
-                    reporterApproved = false
-                    Toast.makeText(context, "Draf dimuat. Persetujuan redaksi harus diberikan ulang.", Toast.LENGTH_SHORT).show()
-                }, modifier = Modifier.weight(1f)) { Text("MUAT DRAF REPORTER") }
-            }
-            Text(if (reporterApproved) "Status: DISETUJUI REDAKSI" else "Status: DRAF — BELUM BOLEH DITERBITKAN", color = if (reporterApproved) Color(0xFF7EE0A3) else Color(0xFFFFD27A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Text("Catatan hak cipta: naskah narasi harus orisinal. Jangan menyalin artikel atau memakai foto, video, musik, maupun logo pihak lain tanpa izin/lisensi yang sesuai. Sumber informasi tetap dicantumkan pada catatan produksi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            Button(onClick = {
-                if (!reporterApproved) {
-                    Toast.makeText(context, "Verifikasi dan persetujuan redaksi diperlukan sebelum menyiapkan video", Toast.LENGTH_LONG).show()
-                } else {
-                    headline = reporterTopic.take(100)
-                    ticker = reporterFacts.take(240)
-                    videoCaption = reporterVideoScript
-                    reporterMaterialAppliedToVideo = true
-                    if (ttsReady) {
-                        tts.language = Locale("id", "ID")
-                        tts.speak(reporterVideoScript, TextToSpeech.QUEUE_FLUSH, null, "infokini-reporter-video-script")
-                    }
-                    Toast.makeText(context, "Naskah video dikirim ke Editor Berita. Pilih visual lalu ekspor MP4.", Toast.LENGTH_LONG).show()
-                }
-            }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)) {
-                Text("SIAPKAN VIDEO BERITA & KIRIM KE EDITOR", fontWeight = FontWeight.Black)
-            }
-
-            OutlinedButton(
-                onClick = { picker.launch(arrayOf("image/*", "video/*")) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
-            ) { Text("PILIH FOTO / VIDEO DARI HP") }
-            Text(mediaLabel, color = Color.LightGray, fontSize = 12.sp)
-
-            Text("MUSIK EKSKLUSIF INFO KINI", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text("Pilih karakter musik InfoKini untuk kebutuhan produksi. Katalog audio orisinal masih disiapkan; pilihan tema di bawah adalah kategori produksi, bukan file musik yang sudah tersedia.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            OutlinedButton(onClick = { musicThemeMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Tema musik: $selectedMusicTheme")
-            }
-            DropdownMenu(expanded = musicThemeMenu, onDismissRequest = { musicThemeMenu = false }) {
-                listOf("InfoKini Breaking News", "InfoKini News Theme", "InfoKini Documentary", "InfoKini Sport", "InfoKini Closing").forEach { theme ->
-                    DropdownMenuItem(text = { Text(theme) }, onClick = { selectedMusicTheme = theme; audioPreferences.edit().putString("music_theme", theme).apply(); musicThemeMenu = false })
-                }
-            }
-            Text("Pilih file audio yang sudah Anda miliki atau berlisensi untuk dipakai. Musik pilihan akan diulang mengikuti durasi video saat ekspor MP4.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            OutlinedButton(onClick = { musicPicker.launch(arrayOf("audio/*")) }, modifier = Modifier.fillMaxWidth()) {
-                Text("PILIH FILE MUSIK (MP3 / AUDIO)")
-            }
-            Text(backgroundMusicLabel, color = Color.LightGray, fontSize = 11.sp)
-            if (narrationAudioFile?.exists() == true) {
-                Text("Volume suara narator: ${(narrationVolume * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
-                Slider(value = narrationVolume, onValueChange = { narrationVolume = it }, valueRange = 0f..1f, onValueChangeFinished = { audioPreferences.edit().putFloat("narration_volume", narrationVolume).apply() })
-            }
-            Text("Volume audio asli video: ${(originalAudioVolume * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
-            Slider(value = originalAudioVolume, onValueChange = { originalAudioVolume = it }, valueRange = 0f..1f, onValueChangeFinished = { audioPreferences.edit().putFloat("original_audio_volume", originalAudioVolume).apply() })
-            if (backgroundMusicUri != null) {
-                Text("Volume musik latar: ${(musicVolume * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
-                Slider(value = musicVolume, onValueChange = { musicVolume = it }, valueRange = 0f..1f, onValueChangeFinished = { audioPreferences.edit().putFloat("music_volume", musicVolume).apply() })
+        }) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = backgroundMusicEnabled, onCheckedChange = { backgroundMusicEnabled = it; audioPreferences.edit().putBoolean("music_enabled", it).apply() })
-                    Text("Sertakan musik saat ekspor MP4", color = Color.White, fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = { backgroundMusicUri = null; backgroundMusicLabel = "Belum ada musik dipilih"; audioPreferences.edit().remove("music_uri").remove("music_label").apply() }, modifier = Modifier.fillMaxWidth()) {
-                    Text("HAPUS PILIHAN MUSIK")
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/audiolibrary"))) }, modifier = Modifier.weight(1f)) {
-                    Text("YouTube Audio Library")
-                }
-                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://pixabay.com/music/"))) }, modifier = Modifier.weight(1f)) {
-                    Text("Pixabay Music")
-                }
-            }
-            Text("Periksa lisensi setiap lagu sebelum dipakai. Gunakan filter 'Attribution not required' bila tidak ingin mencantumkan kredit; lagu Creative Commons wajib diberi atribusi sesuai syarat. Pastikan lisensi mengizinkan penggunaan komersial jika konten dimonetisasi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-
-            if (selectedMedia != null && context.contentResolver.getType(selectedMedia!!)?.startsWith("image/") == true) {
-                Text("EDITOR FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.onGloballyPositioned { photoSectionY = it.positionInParent().y.toInt() })
-                Text("Kecerahan: ${photoBrightness.toInt()}", color = Color.White, fontSize = 12.sp)
-                Slider(value = photoBrightness, onValueChange = { photoBrightness = it }, valueRange = -100f..100f)
-                Text("Kontras: ${"%.1f".format(Locale.US, photoContrast)}", color = Color.White, fontSize = 12.sp)
-                Slider(value = photoContrast, onValueChange = { photoContrast = it }, valueRange = 0.5f..1.8f)
-                Text("Saturasi: ${"%.1f".format(Locale.US, photoSaturation)}", color = Color.White, fontSize = 12.sp)
-                Slider(value = photoSaturation, onValueChange = { photoSaturation = it }, valueRange = 0f..2f)
-                Text("Rotasi: ${photoRotation.toInt()}°", color = Color.White, fontSize = 12.sp)
-                Slider(value = photoRotation, onValueChange = { photoRotation = it }, valueRange = -180f..180f)
-                StudioField("Teks pada foto", photoCaption, { photoCaption = it }, "Tambahkan keterangan atau judul foto...")
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = photoBrandWatermark, onCheckedChange = { photoBrandWatermark = it })
-                    Text("Tambahkan watermark InfoKini pada foto", color = Color.White, fontSize = 12.sp)
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        context.getSharedPreferences("infokini_photo_editor", 0).edit()
-                            .putFloat("brightness", photoBrightness)
-                            .putFloat("contrast", photoContrast)
-                            .putFloat("saturation", photoSaturation)
-                            .putFloat("rotation", photoRotation)
-                            .putBoolean("flip_h", photoFlipHorizontal)
-                            .putBoolean("flip_v", photoFlipVertical)
-                            .putString("caption", photoCaption)
-                            .putBoolean("watermark", photoBrandWatermark).apply()
-                        Toast.makeText(context, "Pengaturan foto tersimpan", Toast.LENGTH_SHORT).show()
-                    }, modifier = Modifier.weight(1f)) { Text("Simpan setelan") }
-                    OutlinedButton(onClick = {
-                        val prefs = context.getSharedPreferences("infokini_photo_editor", 0)
-                        photoBrightness = prefs.getFloat("brightness", 0f)
-                        photoContrast = prefs.getFloat("contrast", 1f)
-                        photoSaturation = prefs.getFloat("saturation", 1f)
-                        photoRotation = prefs.getFloat("rotation", 0f)
-                        photoFlipHorizontal = prefs.getBoolean("flip_h", false)
-                        photoFlipVertical = prefs.getBoolean("flip_v", false)
-                        photoCaption = prefs.getString("caption", "").orEmpty()
-                        photoBrandWatermark = prefs.getBoolean("watermark", true)
-                        Toast.makeText(context, "Pengaturan foto dimuat", Toast.LENGTH_SHORT).show()
-                    }, modifier = Modifier.weight(1f)) { Text("Muat setelan") }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { photoFlipHorizontal = !photoFlipHorizontal }, modifier = Modifier.weight(1f)) {
-                        Text(if (photoFlipHorizontal) "Balik kiri-kanan: aktif" else "Balik kiri-kanan")
+                    Column(Modifier.weight(1f)) {
+                        Text("INFO KINI", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
+                        Text("NEWS STUDIO  •  infokini.news", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
-                    OutlinedButton(onClick = { photoFlipVertical = !photoFlipVertical }, modifier = Modifier.weight(1f)) {
-                        Text(if (photoFlipVertical) "Balik atas-bawah: aktif" else "Balik atas-bawah")
-                    }
+                    Text("V3.0", color = Gold, fontWeight = FontWeight.Bold)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        photoBrightness = 0f
-                        photoContrast = 1f
-                        photoSaturation = 1f
-                        photoRotation = 0f
-                        photoFlipHorizontal = false
-                        photoFlipVertical = false
-                        photoCaption = ""
-                        photoBrandWatermark = true
-                    }, modifier = Modifier.weight(1f)) { Text("Atur ulang") }
-                    Button(onClick = { photoExporter.launch("InfoKini-Foto-Edit.jpg") }, modifier = Modifier.weight(1f)) {
-                        Text("SIMPAN FOTO EDIT")
-                    }
-                }
-            }
-            if (selectedMedia != null && context.contentResolver.getType(selectedMedia!!)?.startsWith("image/") == true) {
-                Button(
-                    onClick = { posterExporter.launch("InfoKini-Poster.png") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
-                ) { Text("EKSPOR POSTER BERITA PNG", fontWeight = FontWeight.Black) }
-                Text("Membuat poster vertikal 1080 × 1920 dengan identitas InfoKini, judul, lokasi, dan running text.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            }
-            if (selectedMedia != null) {
-                val isVideo = context.contentResolver.getType(selectedMedia!!)?.startsWith("video/") == true
-                Text(if (isVideo) "PRATINJAU VIDEO" else "PRATINJAU FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                if (isVideo) {
-                    Text("EDITOR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    if (videoDurationMs >= 1000L) {
-                        Text("Durasi: ${videoDurationMs / 1000}s", color = Color.White, fontSize = 12.sp)
-                        Text("Mulai: ${(videoStartMs / 1000f).toInt()} detik", color = Color.White, fontSize = 12.sp)
-                        Slider(
-                            value = videoStartMs,
-                            onValueChange = { videoStartMs = it.coerceAtMost(videoEndMs - 1000f) },
-                            valueRange = 0f..(videoDurationMs - 1000L).coerceAtLeast(0L).toFloat()
-                        )
-                        Text("Akhir: ${(videoEndMs / 1000f).toInt()} detik", color = Color.White, fontSize = 12.sp)
-                        Slider(
-                            value = videoEndMs,
-                            onValueChange = { videoEndMs = it.coerceAtLeast(videoStartMs + 1000f) },
-                            valueRange = 1000f..videoDurationMs.toFloat()
-                        )
-                        OutlinedButton(
-                            onClick = { multiClipPicker.launch(arrayOf("video/*")) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("TAMBAH KLIP VIDEO KE TIMELINE (" + additionalVideoUris.size + ")")
+                when (page) {
+                    Page.HOME -> HomePage { page = it }
+                    Page.VIDEO -> VideoPage(headline, { headline = it }, ticker, { ticker = it }, script, { script = it }, video, { pickVideo.launch(arrayOf("video/*")) }, music, { pickMusic.launch(arrayOf("audio/*")) }, template, { page = Page.TEMPLATE })
+                    Page.PHOTO -> PhotoPage(photo) { pickPhoto.launch(arrayOf("image/*")) }
+                    Page.TEMPLATE -> TemplatePage(template) { template = it; page = Page.VIDEO }
+                    Page.EDITORIAL -> EditorialPage(topic, { topic = it }, sourceA, { sourceA = it }, sourceB, { sourceB = it }, script, { script = it }, results, searchStatus, {
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            searchStatus = "Mengambil hasil pencarian..."
+                            try {
+                                results = getNewsHeadlines(topic)
+                                searchStatus = if (results.isEmpty()) "Tidak ada judul ditemukan." else "Ada " + results.size + " judul. Periksa isi dan sumber asli sebelum menulis."
+                            } catch (e: Exception) { searchStatus = "Pencarian gagal: " + (e.message ?: "periksa koneksi") }
                         }
-                        if (additionalVideoUris.isNotEmpty()) {
-                            Text(
-                                "URUTAN TIMELINE • Video utama berada di posisi pertama. Atur klip tambahan sebelum ekspor.",
-                                color = Color(0xFFB8C4D9), fontSize = 11.sp
-                            )
-                            additionalVideoUris.forEachIndexed { index, clipUri ->
-                                Row(
-                                    Modifier.fillMaxWidth().background(Color(0xFF17233F), RoundedCornerShape(8.dp)).padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Text(
-                                            "${index + 2}. " + (clipUri.lastPathSegment?.substringAfterLast('/') ?: "Klip video"),
-                                            color = Color.White, fontSize = 10.sp, maxLines = 2
-                                        )
-                                        val trimRange = clipTrimPercentages[clipUri.toString()] ?: (0f to 100f)
-                                        Text("Mulai: ${trimRange.first.toInt()}%", color = Color(0xFFB8C4D9), fontSize = 9.sp)
-                                        Slider(
-                                            value = trimRange.first,
-                                            onValueChange = { value ->
-                                                clipTrimPercentages = clipTrimPercentages + (clipUri.toString() to (value.coerceAtMost(trimRange.second - 1f).coerceAtLeast(0f) to trimRange.second))
-                                            },
-                                            valueRange = 0f..100f
-                                        )
-                                        Text("Akhir: ${trimRange.second.toInt()}%", color = Color(0xFFB8C4D9), fontSize = 9.sp)
-                                        Slider(
-                                            value = trimRange.second,
-                                            onValueChange = { value ->
-                                                clipTrimPercentages = clipTrimPercentages + (clipUri.toString() to (trimRange.first to value.coerceAtLeast(trimRange.first + 1f).coerceAtMost(100f)))
-                                            },
-                                            valueRange = 0f..100f
-                                        )
-                                    }
-                                    TextButton(
-                                        enabled = index > 0,
-                                        onClick = {
-                                            val reordered = additionalVideoUris.toMutableList()
-                                            val previous = reordered[index - 1]
-                                            reordered[index - 1] = reordered[index]
-                                            reordered[index] = previous
-                                            additionalVideoUris = reordered
-                                        }
-                                    ) { Text("↑") }
-                                    TextButton(
-                                        enabled = index < additionalVideoUris.lastIndex,
-                                        onClick = {
-                                            val reordered = additionalVideoUris.toMutableList()
-                                            val next = reordered[index + 1]
-                                            reordered[index + 1] = reordered[index]
-                                            reordered[index] = next
-                                            additionalVideoUris = reordered
-                                        }
-                                    ) { Text("↓") }
-                                    TextButton(onClick = {
-                                        additionalVideoUris = additionalVideoUris.filterIndexed { itemIndex, _ -> itemIndex != index }
-                                    }) { Text("Hapus", color = Color(0xFFFF8A8A)) }
-                                }
-                            }
-                            OutlinedButton(onClick = { additionalVideoUris = emptyList() }, modifier = Modifier.fillMaxWidth()) {
-                                Text("KOSONGKAN KLIP TAMBAHAN")
-                            }
-                        }
-                        Text("EFEK VIDEO • Pengaturan diterapkan ke seluruh klip saat ekspor", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Kecerahan: ${(videoBrightness * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
-                        Slider(value = videoBrightness, onValueChange = { videoBrightness = it }, valueRange = -1f..1f)
-                        Text("Kontras: ${(videoContrast * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
-                        Slider(value = videoContrast, onValueChange = { videoContrast = it }, valueRange = -1f..1f)
-                        Text("Saturasi: ${videoSaturation.toInt()}", color = Color.White, fontSize = 11.sp)
-                        Slider(value = videoSaturation, onValueChange = { videoSaturation = it }, valueRange = -100f..100f)
-                        OutlinedButton(onClick = { videoBrightness = 0f; videoContrast = 0f; videoSaturation = 0f }, modifier = Modifier.fillMaxWidth()) { Text("RESET EFEK VIDEO") }
-                        Button(
-                            onClick = {
-                                if (reporterMaterialAppliedToVideo && !reporterApproved) {
-                                    Toast.makeText(context, "Video dari AI Reporter belum dapat diekspor. Lengkapi verifikasi dan persetujuan redaksi terlebih dahulu.", Toast.LENGTH_LONG).show()
-                                } else {
-                                    videoExporter.launch("${safeExportFileName(projectName)}.mp4")
-                                }
-                            },
-                            enabled = !videoExporting,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
-                        ) { Text(if (videoExporting) "SEDANG EKSPOR..." else "POTONG & EKSPOR MP4", fontWeight = FontWeight.Black) }
-                        Text("Video diproses di perangkat. Lama proses bergantung pada durasi, resolusi, dan kemampuan HP.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-                    } else {
-                        Text("Durasi video belum terbaca. Coba pilih file video lain.", color = Color.LightGray, fontSize = 11.sp)
+                    }, { page = Page.VIDEO })
+                    Page.PRESENTER -> PresenterPage(presenter, { presenter = it }, script, { script = it }, ttsStatus) {
+                        tts.setLanguage(Locale("id", "ID"))
+                        tts.setSpeechRate(0.94f)
+                        val result = tts.speak(script.ifBlank { "Selamat datang di InfoKini News Studio." }, TextToSpeech.QUEUE_FLUSH, null, "infokini-preview")
+                        ttsStatus = if (result == TextToSpeech.SUCCESS) "Naskah dikirim ke mesin TTS perangkat." else "Gagal menjalankan TTS. Periksa pengaturan suara Android."
                     }
-                    AndroidView(
-                        factory = { viewContext ->
-                            VideoView(viewContext).apply {
-                                previewVideoView = this
-                                setVideoURI(selectedMedia)
-                                setOnPreparedListener { player ->
-                                    player.isLooping = true
-                                    seekTo(previewSeekMs.toInt())
-                                    start()
-                                }
-                            }
-                        },
-                        update = { view ->
-                            previewVideoView = view
-                            if (view.tag != selectedMedia.toString()) {
-                                view.tag = selectedMedia.toString()
-                                view.setVideoURI(selectedMedia)
-                                view.setOnPreparedListener { player ->
-                                    player.isLooping = true
-                                    view.seekTo(previewSeekMs.toInt())
-                                    view.start()
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(220.dp)
-                    )
-                    if (videoDurationMs > 1000L) {
-                        Text("POSISI PRATINJAU: " + (previewSeekMs / 1000f).toInt() + " detik", color = Color.White, fontSize = 11.sp)
-                        Slider(
-                            value = previewSeekMs.coerceIn(0f, videoDurationMs.toFloat()),
-                            onValueChange = { position ->
-                                previewSeekMs = position
-                                previewVideoView?.seekTo(position.toInt())
-                            },
-                            valueRange = 0f..videoDurationMs.toFloat()
-                        )
-                        OutlinedButton(
-                            onClick = {
-                                previewSeekMs = videoStartMs
-                                previewVideoView?.seekTo(videoStartMs.toInt())
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("KEMBALI KE TITIK AWAL POTONGAN") }
-                    }
-                } else {
-                    Box(
-                        Modifier.fillMaxWidth().height(220.dp).background(Color.Black),
-                        contentAlignment = Alignment.BottomStart
-                    ) {
-                        AndroidView(
-                            factory = { viewContext ->
-                                ImageView(viewContext).apply {
-                                    scaleType = ImageView.ScaleType.FIT_CENTER
-                                    setBackgroundColor(android.graphics.Color.BLACK)
-                                    setImageURI(selectedMedia)
-                                    colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
-                                    rotation = photoRotation
-                                    scaleX = if (photoFlipHorizontal) -1f else 1f
-                                    scaleY = if (photoFlipVertical) -1f else 1f
-                                }
-                            },
-                            update = { view ->
-                                view.setImageURI(selectedMedia)
-                                view.colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
-                                view.rotation = photoRotation
-                                view.scaleX = if (photoFlipHorizontal) -1f else 1f
-                                view.scaleY = if (photoFlipVertical) -1f else 1f
-                            },
-                            modifier = Modifier.fillMaxWidth().height(220.dp)
-                        )
-                        if (photoCaption.isNotBlank() || photoBrandWatermark) {
-                            Column(
-                                Modifier.fillMaxWidth().background(Color(0xDD080D4A)).padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                if (photoBrandWatermark) {
-                                    Text("INFOKINI.NEWS", color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Black)
-                                }
-                                if (photoCaption.isNotBlank()) {
-                                    Text(photoCaption, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2)
-                                }
-                            }
-                        }
-                    }
+                    Page.SPORTS -> SportsPage(homeTeam, { homeTeam = it }, awayTeam, { awayTeam = it }, homeScore, { homeScore = it }, awayScore, { awayScore = it })
+                    Page.LIVE -> LivePage(context)
                 }
+                Text("InfoKini News Studio • Redaksi memegang kendali atas verifikasi dan publikasi.", color = Muted, fontSize = 10.sp)
             }
-            if (!footballMode && !sportsNewsMode) {
-                Text("NARATOR & PEMBAWA ACARA AI", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Aktifkan mode pembawa acara", color = Color.White, modifier = Modifier.weight(1f))
-                    Switch(checked = aiPresenterEnabled, onCheckedChange = { aiPresenterEnabled = it })
-                }
-                if (aiPresenterEnabled) {
-                    Text("Karakter pembawa acara", color = Color.White, fontSize = 12.sp)
-                    Box {
-                        OutlinedButton(onClick = { presenterMenu = true }, modifier = Modifier.fillMaxWidth()) { Text(presenterStyle) }
-                        DropdownMenu(expanded = presenterMenu, onDismissRequest = { presenterMenu = false }) {
-                            listOf("Presenter Pria", "Presenter Wanita").forEach { option ->
-                                DropdownMenuItem(text = { Text(option) }, onClick = { presenterStyle = option; presenterMenu = false })
-                            }
-                        }
-                    }
-                    Text("Gaya penyampaian narator", color = Color.White, fontSize = 12.sp)
-                    Box {
-                        OutlinedButton(onClick = { deliveryMenu = true }, modifier = Modifier.fillMaxWidth()) { Text(deliveryStyle) }
-                        DropdownMenu(expanded = deliveryMenu, onDismissRequest = { deliveryMenu = false }) {
-                            deliveryStyles.forEach { option ->
-                                DropdownMenuItem(text = { Text(option) }, onClick = { deliveryStyle = option; deliveryMenu = false })
-                            }
-                        }
-                    }
-                    InfoKiniPresenterPortrait(presenterStyle)
-                    Text("Pratinjau karakter ilustratif orisinal InfoKini. Bukan tiruan wajah orang tertentu. Ini belum berupa video manusia fotorealistis atau animasi bibir; keduanya memerlukan layanan avatar khusus.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        context.getSharedPreferences("infokini_studio", 0).edit()
-                            .putString("headline", headline).putString("ticker", ticker)
-                            .putString("location", location).apply()
-                        Toast.makeText(context, "Draf InfoKini tersimpan di perangkat", Toast.LENGTH_SHORT).show()
-                    }, modifier = Modifier.weight(1f)) { Text("Simpan draf") }
-                    OutlinedButton(onClick = {
-                        val prefs = context.getSharedPreferences("infokini_studio", 0)
-                        headline = prefs.getString("headline", "").orEmpty()
-                        ticker = prefs.getString("ticker", "").orEmpty()
-                        location = prefs.getString("location", "").orEmpty()
-                        Toast.makeText(context, "Draf dimuat", Toast.LENGTH_SHORT).show()
-                    }, modifier = Modifier.weight(1f)) { Text("Muat draf") }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        val shareText = "INFO KINI STUDIO\n" + headline + "\n" + location + "\n\n" + ticker
-                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareText) }
-                        context.startActivity(Intent.createChooser(send, "Bagikan konten InfoKini"))
-                    }, modifier = Modifier.weight(1f)) { Text("Bagikan") }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { ttsVoiceMenu = true },
-                            enabled = ttsReady,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Suara: ${selectedTtsVoice.take(18)}") }
-                        DropdownMenu(expanded = ttsVoiceMenu, onDismissRequest = { ttsVoiceMenu = false }) {
-                            ttsVoiceNames.forEach { voiceName ->
-                                DropdownMenuItem(
-                                    text = { Text(voiceName) },
-                                    onClick = { selectedTtsVoice = voiceName; ttsVoiceMenu = false }
-                                )
-                            }
-                        }
-                    }
-                    OutlinedButton(onClick = {
-                        if (ttsReady) {
-                            tts.language = Locale("id", "ID")
-                            tts.voices?.firstOrNull { it.name == selectedTtsVoice }?.let { tts.voice = it }
-                            applyNarrationStyle()
-                            val presenterIntro = if (aiPresenterEnabled) {
-                                if (presenterStyle == "Presenter Wanita") "Pemirsa, berikut informasi InfoKini. " else "Pemirsa, berikut informasi terkini InfoKini. "
-                            } else ""
-                            tts.speak(presenterIntro + "$headline. $ticker", TextToSpeech.QUEUE_FLUSH, null, "infokini-news-script")
-                        } else {
-                            Toast.makeText(context, "Mesin suara Android belum siap", Toast.LENGTH_SHORT).show()
-                        }
-                    }, modifier = Modifier.weight(1f)) { Text("Bacakan naskah") }
-                }
-            }
-            OutlinedButton(
-                onClick = {
-                    val script = listOf(headline.trim(), ticker.trim(), videoCaption.trim())
-                        .filter { it.isNotBlank() }.joinToString(". ")
-                    if (!ttsReady) {
-                        Toast.makeText(context, "Mesin suara Android belum siap", Toast.LENGTH_SHORT).show()
-                    } else if (script.isBlank()) {
-                        Toast.makeText(context, "Isi judul, teks berjalan, atau naskah terlebih dahulu", Toast.LENGTH_SHORT).show()
-                    } else if (narrationGenerating) {
-                        Toast.makeText(context, "Audio narator sedang dibuat", Toast.LENGTH_SHORT).show()
-                    } else {
-                        val narrationFile = File(context.cacheDir, "infokini-narration-${System.currentTimeMillis()}.wav")
-                        tts.language = Locale("id", "ID")
-                        tts.voices?.firstOrNull { it.name == selectedTtsVoice }?.let { tts.voice = it }
-                        applyNarrationStyle()
-                        narrationGenerating = true
-                        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                            override fun onStart(utteranceId: String?) {}
-                            override fun onDone(utteranceId: String?) {
-                                Handler(Looper.getMainLooper()).post {
-                                    narrationGenerating = false
-                                    if (narrationFile.exists() && narrationFile.length() > 44L) {
-                                        narrationAudioFile = narrationFile
-                                        narrationAudioScript = script
-                                        Toast.makeText(context, "Audio narator siap dan akan disertakan saat ekspor MP4", Toast.LENGTH_LONG).show()
-                                    } else {
-                                        narrationFile.delete()
-                                        narrationAudioFile = null
-                                        narrationAudioScript = ""
-                                        Toast.makeText(context, "File audio narator tidak terbentuk dengan benar. Coba lagi atau periksa mesin TTS HP.", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                            }
-                            override fun onError(utteranceId: String?) {
-                                Handler(Looper.getMainLooper()).post {
-                                    narrationGenerating = false
-                                    narrationFile.delete()
-                                    Toast.makeText(context, "Gagal membuat audio narator", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        })
-                        val result = tts.synthesizeToFile(script, Bundle(), narrationFile, "infokini-export-narration")
-                        if (result != TextToSpeech.SUCCESS) {
-                            narrationGenerating = false
-                            narrationFile.delete()
-                            Toast.makeText(context, "Perangkat tidak dapat membuat file suara narator", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                },
-                enabled = !narrationGenerating,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(if (narrationGenerating) "MEMBUAT AUDIO NARATOR..." else "BUAT AUDIO NARATOR UNTUK MP4") }
-            val currentNarrationScript = listOf(headline.trim(), ticker.trim(), videoCaption.trim())
-                .filter { it.isNotBlank() }.joinToString(". ")
-            val narrationIsCurrent = narrationAudioFile?.let { it.exists() && it.length() > 44L } == true &&
-                narrationAudioScript == currentNarrationScript && currentNarrationScript.isNotBlank()
-            Text(
-                if (narrationIsCurrent) "Audio narator siap dan sesuai dengan naskah saat ini." else "Audio narator belum siap atau naskah sudah berubah. Buat ulang sebelum ekspor agar suara tidak tertinggal.",
-                color = if (narrationIsCurrent) Color(0xFF8BE0A0) else Color(0xFFFFD27A), fontSize = 11.sp
-            )
-            if (narrationAudioFile != null) {
-                OutlinedButton(
-                    onClick = {
-                        narrationAudioFile?.delete()
-                        narrationAudioFile = null
-                        narrationAudioScript = ""
-                        Toast.makeText(context, "Audio narator dihapus. Buat ulang bila diperlukan.", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("HAPUS / RESET AUDIO NARATOR") }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Tampilkan label LIVE pada pratinjau", color = Color.White, modifier = Modifier.weight(1f))
-                Switch(checked = live, onCheckedChange = { live = it })
-            }
-            Text("PUSAT INTEGRASI & PENYANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text("Kelola sambungan layanan dari satu tempat. Status hanya berubah menjadi aktif setelah koneksi atau otorisasi benar-benar berhasil.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            Text("1. BACKEND AI / CLOUDFLARE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Text("Alamat backend yang sama digunakan untuk AI Reporter. Simpan URL HTTPS di kolom AI Reporter di atas.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            Text(integrationStatus, color = if (integrationStatus.startsWith("Terhubung")) Color(0xFF8BE0A0) else Color(0xFFFFD27A), fontSize = 11.sp)
-            Button(onClick = {
-                if (!isValidHttpsUrl(aiBackendUrl)) {
-                    integrationStatus = "Gagal: masukkan alamat backend HTTPS yang valid pada bagian AI Reporter."
-                } else screenScope.launch {
-                    integrationTesting = true
-                    integrationStatus = "Sedang menguji endpoint /health..."
-                    try {
-                        val result = testInfoKiniBackend(aiBackendUrl)
-                        integrationStatus = if (result) "Terhubung: endpoint backend merespons sehat. Kesiapan API AI (kunci dan model) diuji saat membuat draf." else "Gagal: backend belum siap atau belum mengonfirmasi status sehat."
-                    } catch (error: Exception) {
-                        integrationStatus = "Gagal terhubung: " + (error.message ?: "periksa URL dan server")
-                    } finally { integrationTesting = false }
-                }
-            }, enabled = !integrationTesting, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)) {
-                Text(if (integrationTesting) "MENGUJI KONEKSI..." else "UJI KONEKSI BACKEND")
-            }
-            androidx.compose.material3.Divider(color = Color(0xFF34415F))
-            Text("2. PRESENTER VIRTUAL / AVATAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            StudioField("URL layanan presenter (HTTPS)", presenterBackendUrl, { presenterBackendUrl = it.trim(); context.getSharedPreferences("infokini_integrations", 0).edit().putString("presenter_url", it.trim()).apply() }, "https://server-avatar-anda.example")
-            Text("Status: $presenterStatus. URL dapat disimpan, tetapi avatar dan sinkronisasi bibir baru aktif setelah penyedia layanan serta format API terintegrasi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            OutlinedButton(onClick = {
-                presenterStatus = if (isValidHttpsUrl(presenterBackendUrl)) "URL tersimpan; belum diuji karena format API penyedia belum ditentukan" else "URL belum valid"
-                Toast.makeText(context, presenterStatus, Toast.LENGTH_LONG).show()
-            }, modifier = Modifier.fillMaxWidth()) { Text("PERIKSA URL PRESENTER") }
-            androidx.compose.material3.Divider(color = Color(0xFF34415F))
-            Text("3. PLATFORM SIARAN LANGSUNG", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Text("YouTube: $youtubeStatus", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://studio.youtube.com/channel/"))) }, modifier = Modifier.fillMaxWidth()) { Text("SAMBUNGKAN / BUKA YOUTUBE STUDIO") }
-            Text("TikTok: $tiktokStatus", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com/live/creator-center"))) }, modifier = Modifier.fillMaxWidth()) { Text("BUKA TIKTOK LIVE CENTER") }
-            Text("Facebook: $facebookStatus", color = Color(0xFFB8C4D9), fontSize = 10.sp)
-            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/live/producer/"))) }, modifier = Modifier.fillMaxWidth()) { Text("BUKA FACEBOOK LIVE PRODUCER") }
-            Text("Catatan keamanan: jangan tempelkan stream key, kata sandi, atau token rahasia ke kolom URL. Koneksi siaran langsung langsung dari aplikasi belum aktif hanya dengan membuka halaman platform; masih memerlukan OAuth/API resmi dan pengujian.", color = Color(0xFFFFD27A), fontSize = 10.sp)
-            Text("KONEKSI SIARAN LANGSUNG", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text("Tautan ini membuka panduan resmi. Tombol LIVE di aplikasi hanya label/pratinjau; siaran langsung langsung dari aplikasi belum aktif dan memerlukan integrasi API, akun, serta pengujian platform.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://support.google.com/youtube/answer/2474026"))) }, modifier = Modifier.weight(1f)) { Text("YouTube Live") }
-                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com/live/creator-center"))) }, modifier = Modifier.weight(1f)) { Text("TikTok LIVE") }
-            }
-            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/business/help/"))) }, modifier = Modifier.fillMaxWidth()) { Text("Panduan Facebook Live") }
-            Button(
-                onClick = { /* preview updates live from editor fields */ },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
-            ) { Text("PERBARUI PRATINJAU", fontWeight = FontWeight.Black) }
-
-            Text("InfoKini Studio\nPowered by Wandi Azis", color = Color(0xFFB8C4D9), fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth())
-
-            Text("Catatan: editor foto, pemotongan video, ekspor MP4 dengan judul dan running text, TTS perangkat, serta grafis skor manual tersedia pada tahap awal. Skor otomatis, pengumpulan berita AI dari sumber tepercaya, siaran langsung platform, dan fitur penyuntingan video lanjutan memerlukan integrasi serta pengujian tambahan.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
         }
     }
-}
-
-
-
-
-internal fun isValidHttpsUrl(value: String): Boolean = try {
-    val parsed = URI(value.trim())
-    parsed.scheme.equals("https", ignoreCase = true) && !parsed.host.isNullOrBlank()
-} catch (_: Exception) { false }
-
-private suspend fun generateNewsScriptWithBackend(
-    baseUrl: String,
-    topic: String,
-    facts: String,
-    sourceOne: String,
-    sourceTwo: String
-): JSONObject = withContext(Dispatchers.IO) {
-    val normalizedBase = baseUrl.trim().trimEnd('/')
-    val connection = (URL("${normalizedBase}/api/news-script").openConnection() as HttpURLConnection).apply {
-        requestMethod = "POST"
-        connectTimeout = 15000
-        readTimeout = 60000
-        doOutput = true
-        setRequestProperty("Content-Type", "application/json; charset=utf-8")
-        setRequestProperty("Accept", "application/json")
-    }
-    try {
-        val payload = JSONObject()
-            .put("topic", topic)
-            .put("facts", facts)
-            .put("sources", org.json.JSONArray().put(sourceOne).put(sourceTwo))
-        connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-        if (status !in 200..299) {
-            val message = try { JSONObject(body).optString("error", "HTTP \$status") } catch (_: Exception) { "HTTP \$status" }
-            throw IllegalStateException(message)
-        }
-        val result = JSONObject(body)
-        if (result.optString("script").isBlank()) throw IllegalStateException("Backend tidak mengembalikan naskah.")
-        result
-    } finally { connection.disconnect() }
-}
-
-internal data class ReporterRssItem(val title: String, val link: String, val published: String, val source: String)
-
-private suspend fun fetchGoogleNewsRss(query: String): List<ReporterRssItem> = withContext(Dispatchers.IO) {
-    val encoded = URLEncoder.encode(query, "UTF-8")
-    val feedUrl = URL("https://news.google.com/rss/search?q=$encoded&hl=id&gl=ID&ceid=ID:id")
-    val connection = feedUrl.openConnection().apply {
-        connectTimeout = 12000
-        readTimeout = 12000
-        setRequestProperty("User-Agent", "InfoKiniStudio/2.5 (Android)")
-    }
-    connection.getInputStream().use { stream ->
-        val parser = Xml.newPullParser()
-        parser.setInput(stream, "UTF-8")
-        val items = mutableListOf<ReporterRssItem>()
-        var event = parser.eventType
-        var insideItem = false
-        var tag = ""
-        var title = ""; var link = ""; var published = ""; var source = ""
-        while (event != XmlPullParser.END_DOCUMENT && items.size < 15) {
-            when (event) {
-                XmlPullParser.START_TAG -> {
-                    tag = parser.name
-                    if (tag == "item") {
-                        insideItem = true
-                        title = ""; link = ""; published = ""; source = ""
-                    }
-                }
-                XmlPullParser.TEXT -> if (insideItem) when (tag) {
-                    "title" -> title += parser.text
-                    "link" -> link += parser.text
-                    "pubDate" -> published += parser.text
-                    "source" -> source += parser.text
-                }
-                XmlPullParser.END_TAG -> if (parser.name == "item" && insideItem) {
-                    if (title.isNotBlank() && link.startsWith("https://")) {
-                        items.add(ReporterRssItem(title.trim(), link.trim(), published.trim(), source.trim().ifBlank { "Google News RSS" }))
-                    }
-                    insideItem = false
-                }
-            }
-            event = parser.next()
-        }
-        items
-    }
-}
-
-internal fun safeExportFileName(value: String): String {
-    val normalized = value.trim()
-        .replace(Regex("[^A-Za-z0-9._ -]"), "")
-        .replace(Regex("\\s+"), "-")
-        .replace(Regex("-{2,}"), "-")
-        .trim('-', '.', ' ')
-        .take(48)
-    return normalized.ifBlank { "InfoKini-Video-Edit" }
-}
-
-internal fun isValidHttpUrl(value: String): Boolean {
-    return try {
-        val parsed = URI(value.trim())
-        (parsed.scheme.equals("https", ignoreCase = true) || parsed.scheme.equals("http", ignoreCase = true)) &&
-            !parsed.host.isNullOrBlank()
-    } catch (_: Exception) {
-        false
-    }
-}
-
-internal fun isValidIndependentSourcePair(primary: String, comparison: String): Boolean {
-    if (!isValidHttpUrl(primary) || !isValidHttpUrl(comparison)) return false
-    return try {
-        val primaryHost = URI(primary.trim()).host.lowercase(Locale.ROOT).removePrefix("www.")
-        val comparisonHost = URI(comparison.trim()).host.lowercase(Locale.ROOT).removePrefix("www.")
-        primaryHost != comparisonHost
-    } catch (_: Exception) {
-        false
-    }
-}
-
-private fun openReporterSource(context: android.content.Context, value: String) {
-    try {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(value.trim()))
-        context.startActivity(intent)
-    } catch (_: Exception) {
-        Toast.makeText(context, "Tautan sumber tidak dapat dibuka", Toast.LENGTH_SHORT).show()
-    }
-}
-
-private fun createPhotoColorMatrix(brightness: Float, contrast: Float, saturation: Float): ColorMatrix {
-    val inverse = 1f - saturation
-    val red = 0.213f * inverse
-    val green = 0.715f * inverse
-    val blue = 0.072f * inverse
-    return ColorMatrix(floatArrayOf(
-        (red + saturation) * contrast, green * contrast, blue * contrast, 0f, brightness,
-        red * contrast, (green + saturation) * contrast, blue * contrast, 0f, brightness,
-        red * contrast, green * contrast, (blue + saturation) * contrast, 0f, brightness,
-        0f, 0f, 0f, 1f, 0f
-    ))
 }
 
 @Composable
-private fun StudioField(label: String, value: String, onValueChange: (String) -> Unit, hint: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(8.dp)).padding(12.dp),
-            textStyle = androidx.compose.ui.text.TextStyle(color = Ink, fontSize = 14.sp),
-            decorationBox = { inner ->
-                Box {
-                    if (value.isEmpty()) Text(hint, color = Color.Gray, fontSize = 14.sp)
-                    inner()
-                }
+private fun HomePage(go: (Page) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        Surface(color = Panel, shape = RoundedCornerShape(22.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF29486B))) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("RUANG REDAKSI DIGITAL", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("Produksi berita. Dengan standar televisi.", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Black)
+                Text("Satu ruang kerja untuk naskah, visual, suara, dan video berita InfoKini.", color = Muted, fontSize = 12.sp)
+                Button(onClick = { go(Page.VIDEO) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Navy)) { Text("MULAI PRODUKSI  →", fontWeight = FontWeight.Black) }
             }
+        }
+        Text("MENU STUDIO", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        val items = listOf(
+            Triple("EDITOR VIDEO", "Klip, judul, ticker, audio dan ekspor", Page.VIDEO),
+            Triple("EDITOR FOTO", "Materi visual, poster dan thumbnail", Page.PHOTO),
+            Triple("GALERI TEMPLATE", "Identitas visual program berita", Page.TEMPLATE),
+            Triple("AI REDAKTUR", "Pencarian sumber dan draf berita", Page.EDITORIAL),
+            Triple("PRESENTER & NARATOR", "Karakter presenter dan suara TTS", Page.PRESENTER),
+            Triple("GRAFIS OLAHRAGA", "Papan skor pertandingan", Page.SPORTS),
+            Triple("SIARAN LANGSUNG", "Persiapan platform live", Page.LIVE)
         )
+        items.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { item ->
+                    Surface(onClick = { go(item.third) }, modifier = Modifier.weight(1f), color = Panel, shape = RoundedCornerShape(15.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF29486B))) {
+                        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text(item.first, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                            Text(item.second, color = Muted, fontSize = 10.sp)
+                            Text("BUKA →", color = Accent, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                        }
+                    }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        Surface(color = Color(0xFF30291A), shape = RoundedCornerShape(12.dp)) {
+            Text("Integrasi avatar manusia realistis, layanan AI redaksi, dan siaran langsung langsung membutuhkan API resmi serta konfigurasi akun.", Modifier.padding(13.dp), color = Gold, fontSize = 10.sp)
+        }
     }
 }
 
+@Composable
+private fun PageHeading(kicker: String, title: String, detail: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(kicker, color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(title, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Black)
+        Text(detail, color = Muted, fontSize = 11.sp)
+    }
+}
 
-private suspend fun testInfoKiniBackend(baseUrl: String): Boolean = withContext(Dispatchers.IO) {
-    val normalizedBase = baseUrl.trim().trimEnd('/')
-    val connection = (URL("$normalizedBase/health").openConnection() as HttpURLConnection).apply {
-        requestMethod = "GET"
+@Composable
+private fun CardBlock(content: @Composable ColumnScope.() -> Unit) {
+    Surface(color = Panel, shape = RoundedCornerShape(16.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF29486B))) {
+        Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+    }
+}
+
+@Composable
+private fun EditField(label: String, value: String, change: (String) -> Unit, hint: String = "") {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(label, color = Muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        OutlinedTextField(value = value, onValueChange = change, modifier = Modifier.fillMaxWidth(), placeholder = { Text(hint, fontSize = 12.sp) }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Accent, unfocusedBorderColor = Color(0xFF3A5272), cursorColor = Accent))
+    }
+}
+
+@Composable
+private fun ActionButton(label: String, click: () -> Unit, primary: Boolean = false) {
+    if (primary) Button(onClick = click, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Navy)) { Text(label, fontWeight = FontWeight.Bold) }
+    else OutlinedButton(onClick = click, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = Accent)) { Text(label) }
+}
+
+@Composable
+private fun VideoPage(headline: String, onHeadline: (String) -> Unit, ticker: String, onTicker: (String) -> Unit, script: String, onScript: (String) -> Unit, video: Uri?, pickVideo: () -> Unit, music: Uri?, pickMusic: () -> Unit, template: String, openTemplates: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PageHeading("RUANG PRODUKSI / 01", "Editor Video", "Materi, naskah, identitas tayangan, dan audio.")
+        CardBlock {
+            Text("MATERI VIDEO", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            if (video == null) Text("Belum ada video dipilih", color = Muted, modifier = Modifier.fillMaxWidth().background(Navy, RoundedCornerShape(10.dp)).padding(24.dp))
+            else AndroidView(factory = { VideoView(it).apply { setVideoURI(video); setOnPreparedListener { player -> player.isLooping = true; start() } } }, modifier = Modifier.fillMaxWidth().height(205.dp).background(Color.Black))
+            ActionButton("＋ PILIH VIDEO", pickVideo, true)
+        }
+        CardBlock {
+            Text("IDENTITAS BERITA", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            EditField("Judul berita", headline, onHeadline, "Masukkan judul utama")
+            EditField("Running text / ticker", ticker, onTicker, "Informasi berjalan di bagian bawah")
+            Text("Template aktif: " + template, color = Muted, fontSize = 11.sp)
+            ActionButton("GANTI TEMPLATE", openTemplates)
+        }
+        CardBlock {
+            Text("NASKAH PRESENTER", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            EditField("Isi naskah", script, onScript, "Tulis naskah berita untuk dibacakan")
+        }
+        CardBlock {
+            Text("AUDIO LATAR", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(if (music == null) "Belum ada musik latar dipilih" else "Musik: " + music.lastPathSegment, color = Muted, fontSize = 11.sp)
+            ActionButton("PILIH MUSIK", pickMusic)
+        }
+        CardBlock {
+            Text("MESIN EKSPOR", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("Ekspor MP4 dan timeline multi-klip akan dibangun setelah fondasi navigasi dan penyimpanan proyek ini lolos build. Pratinjau sekarang memutar klip sumber.", color = Gold, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun PhotoPage(photo: Uri?, pick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PageHeading("RUANG PRODUKSI / 02", "Editor Foto", "Pilih materi visual untuk poster dan thumbnail berita.")
+        CardBlock {
+            Text(if (photo == null) "Belum ada foto dipilih." else "Foto dipilih: " + photo.lastPathSegment, color = Muted, fontSize = 12.sp)
+            ActionButton("＋ PILIH FOTO", pick, true)
+            Text("Panel penyuntingan foto dan ekspor poster akan dibangun pada tahap editor berikutnya.", color = Gold, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun TemplatePage(selected: String, choose: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        PageHeading("IDENTITAS VISUAL", "Galeri Template", "Pilih gaya visual untuk proyek berita.")
+        listOf("InfoKini Utama", "Breaking News", "Liputan Desa", "Wawancara", "Olahraga", "Info Cuaca", "Ekonomi & UMKM", "Dokumenter", "Kriminal", "Vertikal Sosial Media").forEachIndexed { i, name ->
+            Surface(onClick = { choose(name) }, color = if (selected == name) Color(0xFF183D57) else Panel, shape = RoundedCornerShape(13.dp), border = androidx.compose.foundation.BorderStroke(1.dp, if (selected == name) Accent else Color(0xFF29486B))) {
+                Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(42.dp, 30.dp).background(listOf(Color(0xFFB92737), Color(0xFF315A44), Color(0xFF4A3978), Color(0xFF13617A))[i % 4], RoundedCornerShape(5.dp)))
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(if (selected == name) "Sedang dipilih" else "Pilih template", color = Muted, fontSize = 10.sp)
+                    }
+                    Text(if (selected == name) "✓" else "›", color = Accent, fontSize = 20.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditorialPage(topic: String, onTopic: (String) -> Unit, sourceA: String, onSourceA: (String) -> Unit, sourceB: String, onSourceB: (String) -> Unit, script: String, onScript: (String) -> Unit, results: List<String>, status: String, search: () -> Unit, toVideo: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PageHeading("RUANG REDAKSI / 03", "AI Redaktur", "Cari bahan awal, periksa sumber, lalu susun draf. Tidak ada publikasi otomatis.")
+        CardBlock {
+            EditField("Topik pencarian", topic, onTopic, "Contoh: banjir Cigombong")
+            ActionButton("CARI JUDUL DARI GOOGLE NEWS", search, true)
+            Text(status, color = Muted, fontSize = 11.sp)
+            results.forEach { Text(it, color = Color.White, fontSize = 11.sp) }
+        }
+        CardBlock {
+            Text("PEMERIKSAAN SUMBER", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            EditField("URL sumber utama", sourceA, onSourceA, "https://...")
+            EditField("URL sumber pembanding", sourceB, onSourceB, "https://...")
+            Text("Baca isi sumber asli, periksa tanggal, gunakan sumber independen dan konfirmasi fakta.", color = Gold, fontSize = 10.sp)
+        }
+        CardBlock {
+            Text("DRAF NASKAH", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            EditField("Naskah redaksi", script, onScript, "Susun naskah dari fakta yang sudah diperiksa")
+            ActionButton("LANJUTKAN KE EDITOR VIDEO", toVideo, true)
+        }
+    }
+}
+
+@Composable
+private fun PresenterPage(presenter: String, onPresenter: (String) -> Unit, script: String, onScript: (String) -> Unit, status: String, speak: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PageHeading("STUDIO SUARA", "Presenter & Narator", "Pilihan suara TTS bergantung pada paket bahasa Android.")
+        CardBlock {
+            Text("KONSEP PRESENTER", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            listOf("Presenter perempuan", "Presenter laki-laki").forEach { item ->
+                Row(Modifier.fillMaxWidth().clickable { onPresenter(item) }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = presenter == item, onClick = { onPresenter(item) }, colors = RadioButtonDefaults.colors(selectedColor = Accent))
+                    Text(item, color = Color.White, fontSize = 12.sp)
+                }
+            }
+            Text("Presenter manusia realistis dan sinkronisasi bibir memerlukan layanan avatar khusus; belum aktif di versi dasar ini.", color = Gold, fontSize = 10.sp)
+        }
+        CardBlock {
+            EditField("Naskah untuk dibacakan", script, onScript, "Masukkan naskah")
+            ActionButton("▶ DENGARKAN PRATINJAU", speak, true)
+            Text(status, color = Muted, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+private fun SportsPage(home: String, setHome: (String) -> Unit, away: String, setAway: (String) -> Unit, hs: Int, setHs: (Int) -> Unit, ascore: Int, setAs: (Int) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PageHeading("GRAFIS SIARAN", "Grafis Olahraga", "Papan skor manual untuk grafis pertandingan.")
+        CardBlock {
+            EditField("Tim tuan rumah", home, setHome)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(hs.toString(), color = Color.White, fontSize = 42.sp, fontWeight = FontWeight.Black)
+                    Row { TextButton(onClick = { setHs((hs - 1).coerceAtLeast(0)) }) { Text("−", color = Accent) }; TextButton(onClick = { setHs(hs + 1) }) { Text("+", color = Accent) } }
+                }
+                Text("VS", color = Gold, fontWeight = FontWeight.Black)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(ascore.toString(), color = Color.White, fontSize = 42.sp, fontWeight = FontWeight.Black)
+                    Row { TextButton(onClick = { setAs((ascore - 1).coerceAtLeast(0)) }) { Text("−", color = Accent) }; TextButton(onClick = { setAs(ascore + 1) }) { Text("+", color = Accent) } }
+                }
+            }
+            EditField("Tim tamu", away, setAway)
+        }
+    }
+}
+
+@Composable
+private fun LivePage(context: Context) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PageHeading("DISTRIBUSI", "Siaran Langsung", "Pusat persiapan platform distribusi.")
+        listOf(Triple("YOUTUBE LIVE", "Perlu otorisasi, konfigurasi encoder/RTMP dan pengujian.", "https://studio.youtube.com/channel/"),
+            Triple("TIKTOK LIVE", "Perlu akses LIVE dan integrasi resmi.", "https://www.tiktok.com/live/creator-center"),
+            Triple("FACEBOOK LIVE", "Perlu otorisasi akun dan konfigurasi siaran.", "https://www.facebook.com/live/producer/")).forEach { item ->
+            CardBlock {
+                Text(item.first, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(item.second, color = Gold, fontSize = 11.sp)
+                ActionButton("BUKA " + item.first, { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.third))) } })
+            }
+        }
+    }
+}
+
+private suspend fun getNewsHeadlines(query: String): List<String> = withContext(Dispatchers.IO) {
+    require(query.isNotBlank()) { "Isi topik pencarian terlebih dahulu." }
+    val encoded = URLEncoder.encode(query, "UTF-8")
+    val connection = URL("https://news.google.com/rss/search?q=" + encoded + "&hl=id&gl=ID&ceid=ID:id").openConnection().apply {
         connectTimeout = 10000
-        readTimeout = 12000
-        setRequestProperty("Accept", "application/json")
+        readTimeout = 10000
+        setRequestProperty("User-Agent", "InfoKiniNewsStudio/3.0")
     }
     try {
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-        status in 200..299 && JSONObject(body).optBoolean("ok", false)
-    } finally { connection.disconnect() }
+        connection.getInputStream().use { stream ->
+            val parser = Xml.newPullParser()
+            parser.setInput(stream, "UTF-8")
+            val items = mutableListOf<String>()
+            var event = parser.eventType
+            var insideItem = false
+            var insideTitle = false
+            var title = ""
+            while (event != XmlPullParser.END_DOCUMENT && items.size < 10) {
+                when (event) {
+                    XmlPullParser.START_TAG -> when (parser.name) {
+                        "item" -> { insideItem = true; title = "" }
+                        "title" -> if (insideItem) insideTitle = true
+                    }
+                    XmlPullParser.TEXT -> if (insideItem && insideTitle) title += parser.text
+                    XmlPullParser.END_TAG -> when (parser.name) {
+                        "title" -> insideTitle = false
+                        "item" -> { if (title.isNotBlank()) items.add(title.trim()); insideItem = false }
+                    }
+                }
+                event = parser.next()
+            }
+            items
+        }
+    } finally { (connection as? java.net.HttpURLConnection)?.disconnect() }
 }
