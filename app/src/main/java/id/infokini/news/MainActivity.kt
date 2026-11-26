@@ -114,6 +114,7 @@ fun InfoKiniStudio() {
     var reporterFacts by remember { mutableStateOf("") }
     var reporterVideoScript by remember { mutableStateOf("") }
     var reporterApproved by remember { mutableStateOf(false) }
+    var reporterMaterialAppliedToVideo by remember { mutableStateOf(false) }
     var reporterVerified by remember { mutableStateOf(false) }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("") }
@@ -789,14 +790,14 @@ fun InfoKiniStudio() {
                 if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
                 else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://news.google.com/search?q=" + Uri.encode(reporterTopic))))
             }, modifier = Modifier.fillMaxWidth()) { Text("CARI SUMBER BERITA TERKINI (GOOGLE NEWS)") }
-            StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false }, "Contoh: banjir, kebijakan publik, olahraga...")
-            StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false }, "Tempel URL berita atau unggahan publik...")
-            StudioField("Fakta dan hasil konfirmasi", reporterFacts, { reporterFacts = it; reporterApproved = false }, "Catat siapa, apa, kapan, di mana, bukti, dan tanggapan...")
+            StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Contoh: banjir, kebijakan publik, olahraga...")
+            StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL berita atau unggahan publik...")
+            StudioField("Fakta dan hasil konfirmasi", reporterFacts, { reporterFacts = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Catat siapa, apa, kapan, di mana, bukti, dan tanggapan...")
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = reporterVerified, onCheckedChange = { reporterVerified = it; reporterApproved = false })
+                Checkbox(checked = reporterVerified, onCheckedChange = { reporterVerified = it; reporterApproved = false; reporterMaterialAppliedToVideo = false })
                 Text("Sudah diverifikasi dan dikonfirmasi redaksi", color = Color.White, fontSize = 12.sp)
             }
-            StudioField("Naskah narasi video (bukan artikel)", reporterVideoScript, { reporterVideoScript = it; reporterApproved = false }, "Tulis kalimat yang akan dibacakan presenter/narator...")
+            StudioField("Naskah narasi video (bukan artikel)", reporterVideoScript, { reporterVideoScript = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tulis kalimat yang akan dibacakan presenter/narator...")
             if (reporterSourceUrl.startsWith("https://") || reporterSourceUrl.startsWith("http://")) {
                 OutlinedButton(onClick = { try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(reporterSourceUrl))) } catch (_: Exception) { Toast.makeText(context, "Tautan tidak dapat dibuka", Toast.LENGTH_SHORT).show() } }, modifier = Modifier.fillMaxWidth()) {
                     Text("BUKA & PERIKSA SUMBER")
@@ -841,6 +842,7 @@ fun InfoKiniStudio() {
                 } else {
                     headline = reporterTopic.take(100)
                     ticker = reporterFacts.take(240)
+                    reporterMaterialAppliedToVideo = true
                     if (ttsReady) {
                         tts.language = Locale("id", "ID")
                         tts.speak(reporterVideoScript, TextToSpeech.QUEUE_FLUSH, null, "infokini-reporter-video-script")
@@ -986,8 +988,7 @@ fun InfoKiniStudio() {
                         )
                         Button(
                             onClick = {
-                                val containsReporterMaterial = reporterTopic.isNotBlank() || reporterVideoScript.isNotBlank()
-                                if (containsReporterMaterial && !reporterApproved) {
+                                if (reporterMaterialAppliedToVideo && !reporterApproved) {
                                     Toast.makeText(context, "Video dari AI Reporter belum dapat diekspor. Lengkapi verifikasi dan persetujuan redaksi terlebih dahulu.", Toast.LENGTH_LONG).show()
                                 } else {
                                     videoExporter.launch("InfoKini-Video-Edit.mp4")
