@@ -1079,6 +1079,7 @@ fun InfoKiniStudio() {
                 } else {
                     headline = reporterTopic.take(100)
                     ticker = reporterFacts.take(240)
+                    videoCaption = reporterVideoScript
                     reporterMaterialAppliedToVideo = true
                     if (ttsReady) {
                         tts.language = Locale("id", "ID")
