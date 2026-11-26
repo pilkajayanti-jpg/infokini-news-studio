@@ -814,7 +814,7 @@ fun InfoKiniStudio() {
                 colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
             ) { Text("PERBARUI PRATINJAU", fontWeight = FontWeight.Black) }
 
-            Text("Tentang aplikasi: InfoKini News Studio. Penggagas: Wandi Azis.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Text("InfoKini News Studio\nPowered by Wandi Azis", color = Color(0xFFB8C4D9), fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth())
 
             Text("Mode skor sepak bola masih tahap dasar. Logo tim/kompetisi, jam pertandingan otomatis, statistik laga, dan ekspor grafis video memerlukan pengembangan lanjutan. Ekspor MP4, editor video penuh, AI redaktur, TTS, dan siaran langsung juga belum selesai.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
         }
