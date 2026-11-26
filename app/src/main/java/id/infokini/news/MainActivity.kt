@@ -73,7 +73,23 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun InfoKiniStudio() {
     val context = LocalContext.current
-    val tts = remember { TextToSpeech(context) { } }
+    var ttsReady by remember { mutableStateOf(false) }
+    var ttsVoiceNames by remember { mutableStateOf(listOf("Default Android")) }
+    var selectedTtsVoice by remember { mutableStateOf("Default Android") }
+    var ttsVoiceMenu by remember { mutableStateOf(false) }
+    val tts = remember {
+        TextToSpeech(context) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+        }
+    }
+    LaunchedEffect(ttsReady) {
+        if (ttsReady) {
+            val voices = tts.voices?.filter { it.locale.language == "id" }.orEmpty()
+            val names = voices.map { it.name }.distinct()
+            ttsVoiceNames = names.ifEmpty { listOf("Default Android") }
+            if (selectedTtsVoice !in ttsVoiceNames) selectedTtsVoice = ttsVoiceNames.first()
+        }
+    }
     DisposableEffect(tts) { onDispose { tts.stop(); tts.shutdown() } }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("") }
@@ -799,9 +815,29 @@ fun InfoKiniStudio() {
                         val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareText) }
                         context.startActivity(Intent.createChooser(send, "Bagikan konten InfoKini"))
                     }, modifier = Modifier.weight(1f)) { Text("Bagikan") }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { ttsVoiceMenu = true },
+                            enabled = ttsReady,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Suara: ${selectedTtsVoice.take(18)}") }
+                        DropdownMenu(expanded = ttsVoiceMenu, onDismissRequest = { ttsVoiceMenu = false }) {
+                            ttsVoiceNames.forEach { voiceName ->
+                                DropdownMenuItem(
+                                    text = { Text(voiceName) },
+                                    onClick = { selectedTtsVoice = voiceName; ttsVoiceMenu = false }
+                                )
+                            }
+                        }
+                    }
                     OutlinedButton(onClick = {
-                        tts.language = Locale("id", "ID")
-                        tts.speak("$headline. $ticker", TextToSpeech.QUEUE_FLUSH, null, "infokini-news-script")
+                        if (ttsReady) {
+                            tts.language = Locale("id", "ID")
+                            tts.voices?.firstOrNull { it.name == selectedTtsVoice }?.let { tts.voice = it }
+                            tts.speak("$headline. $ticker", TextToSpeech.QUEUE_FLUSH, null, "infokini-news-script")
+                        } else {
+                            Toast.makeText(context, "Mesin suara Android belum siap", Toast.LENGTH_SHORT).show()
+                        }
                     }, modifier = Modifier.weight(1f)) { Text("Bacakan naskah") }
                 }
             }
@@ -817,7 +853,7 @@ fun InfoKiniStudio() {
 
             Text("InfoKini News Studio\nPowered by Wandi Azis", color = Color(0xFFB8C4D9), fontSize = 11.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth())
 
-            Text("Mode skor sepak bola masih tahap dasar. Logo tim/kompetisi, jam pertandingan otomatis, statistik laga, dan ekspor grafis video memerlukan pengembangan lanjutan. Ekspor MP4, editor video penuh, AI redaktur, TTS, dan siaran langsung juga belum selesai.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            Text("Catatan: editor foto, pemotongan video, ekspor MP4 dengan judul dan running text, TTS perangkat, serta grafis skor manual tersedia pada tahap awal. Skor otomatis, pengumpulan berita AI dari sumber tepercaya, siaran langsung platform, dan fitur penyuntingan video lanjutan memerlukan integrasi serta pengujian tambahan.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
         }
     }
 }
