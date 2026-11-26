@@ -329,7 +329,11 @@ fun InfoKiniStudio() {
                         overlayText.setSpan(StyleSpan(Typeface.BOLD), brandStart, combined.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                         videoOverlays.add(TextOverlay.createStaticTextOverlay(overlayText))
                     }
-                    val targetAspectRatio = if (selectedAspectRatio.startsWith("9:16")) 9f / 16f else 16f / 9f
+                    val targetAspectRatio = when {
+                        selectedAspectRatio.startsWith("9:16") -> 9f / 16f
+                        selectedAspectRatio.startsWith("1:1") -> 1f
+                        else -> 16f / 9f
+                    }
                     val aspectPresentation = Presentation.createForAspectRatio(
                         targetAspectRatio,
                         Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
@@ -975,7 +979,7 @@ fun InfoKiniStudio() {
                     Text(selectedAspectRatio)
                 }
                 DropdownMenu(expanded = aspectMenu, onDismissRequest = { aspectMenu = false }) {
-                    listOf("16:9 • YouTube / TV", "9:16 • TikTok / Reels / Shorts").forEach { ratio ->
+                    listOf("16:9 • YouTube / TV", "9:16 • TikTok / Reels / Shorts", "1:1 • Feed Instagram / Facebook").forEach { ratio ->
                         DropdownMenuItem(text = { Text(ratio) }, onClick = {
                             selectedAspectRatio = ratio
                             aspectMenu = false
