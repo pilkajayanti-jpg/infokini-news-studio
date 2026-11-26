@@ -73,6 +73,8 @@ fun InfoKiniStudio() {
     var photoContrast by remember { mutableFloatStateOf(1f) }
     var photoSaturation by remember { mutableFloatStateOf(1f) }
     var photoRotation by remember { mutableFloatStateOf(0f) }
+    var photoFlipHorizontal by remember { mutableStateOf(false) }
+    var photoFlipVertical by remember { mutableStateOf(false) }
     var videoDurationMs by remember { mutableLongStateOf(0L) }
     var videoStartMs by remember { mutableFloatStateOf(0f) }
     var videoEndMs by remember { mutableFloatStateOf(0f) }
@@ -340,7 +342,7 @@ fun InfoKiniStudio() {
                 try {
                     val source = context.contentResolver.openInputStream(sourceUri)?.use { BitmapFactory.decodeStream(it) }
                         ?: throw IllegalStateException("Foto tidak dapat dibaca")
-                    val rotateMatrix = Matrix().apply { postRotate(photoRotation) }
+                    val rotateMatrix = Matrix().apply { postScale(if (photoFlipHorizontal) -1f else 1f, if (photoFlipVertical) -1f else 1f); postRotate(photoRotation) }
                     val rotated = Bitmap.createBitmap(source, 0, 0, source.width, source.height, rotateMatrix, true)
                     val edited = Bitmap.createBitmap(rotated.width, rotated.height, Bitmap.Config.ARGB_8888)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
@@ -572,11 +574,21 @@ fun InfoKiniStudio() {
                 Text("Rotasi: ${photoRotation.toInt()}°", color = Color.White, fontSize = 12.sp)
                 Slider(value = photoRotation, onValueChange = { photoRotation = it }, valueRange = -180f..180f)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { photoFlipHorizontal = !photoFlipHorizontal }, modifier = Modifier.weight(1f)) {
+                        Text(if (photoFlipHorizontal) "Balik kiri-kanan: aktif" else "Balik kiri-kanan")
+                    }
+                    OutlinedButton(onClick = { photoFlipVertical = !photoFlipVertical }, modifier = Modifier.weight(1f)) {
+                        Text(if (photoFlipVertical) "Balik atas-bawah: aktif" else "Balik atas-bawah")
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         photoBrightness = 0f
                         photoContrast = 1f
                         photoSaturation = 1f
                         photoRotation = 0f
+                        photoFlipHorizontal = false
+                        photoFlipVertical = false
                     }, modifier = Modifier.weight(1f)) { Text("Atur ulang") }
                     Button(onClick = { photoExporter.launch("InfoKini-Foto-Edit.jpg") }, modifier = Modifier.weight(1f)) {
                         Text("SIMPAN FOTO EDIT")
@@ -645,12 +657,16 @@ fun InfoKiniStudio() {
                                 setImageURI(selectedMedia)
                                 colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
                                 rotation = photoRotation
+                                scaleX = if (photoFlipHorizontal) -1f else 1f
+                                scaleY = if (photoFlipVertical) -1f else 1f
                             }
                         },
                         update = { view ->
                             view.setImageURI(selectedMedia)
                             view.colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
                             view.rotation = photoRotation
+                            view.scaleX = if (photoFlipHorizontal) -1f else 1f
+                            view.scaleY = if (photoFlipVertical) -1f else 1f
                         },
                         modifier = Modifier.fillMaxWidth().height(220.dp)
                     )
