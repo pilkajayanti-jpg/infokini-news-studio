@@ -6,6 +6,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.widget.VideoView
+import android.widget.FrameLayout
+import android.widget.TextView
+import android.view.Gravity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -223,7 +226,40 @@ private fun VideoPage(headline: String, onHeadline: (String) -> Unit, ticker: St
         CardBlock {
             Text("MATERI VIDEO", color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             if (video == null) Text("Belum ada video dipilih", color = Muted, modifier = Modifier.fillMaxWidth().background(Navy, RoundedCornerShape(10.dp)).padding(24.dp))
-            else AndroidView(factory = { VideoView(it).apply { setVideoURI(video); setOnPreparedListener { player -> player.isLooping = true; start() } } }, modifier = Modifier.fillMaxWidth().height(205.dp).background(Color.Black))
+            else AndroidView(
+                factory = { ctx ->
+                    val frame = FrameLayout(ctx).apply { setBackgroundColor(android.graphics.Color.BLACK) }
+                    val player = VideoView(ctx).apply {
+                        setVideoURI(video)
+                        setOnPreparedListener { media -> media.isLooping = true; start() }
+                    }
+                    frame.addView(player, FrameLayout.LayoutParams(-1, -1))
+                    val titleView = TextView(ctx).apply {
+                        setTextColor(android.graphics.Color.WHITE)
+                        textSize = 15f
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        setPadding(12, 9, 12, 9)
+                        setBackgroundColor(android.graphics.Color.argb(210, 150, 20, 35))
+                    }
+                    frame.addView(titleView, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+                    val tickerView = TextView(ctx).apply {
+                        setTextColor(android.graphics.Color.WHITE)
+                        textSize = 12f
+                        setPadding(12, 10, 12, 10)
+                        setBackgroundColor(android.graphics.Color.argb(225, 7, 20, 46))
+                        gravity = Gravity.CENTER_VERTICAL
+                    }
+                    frame.addView(tickerView, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+                    frame.tag = Pair(titleView, tickerView)
+                    frame
+                },
+                update = { frame ->
+                    val labels = frame.tag as? Pair<*, *>
+                    (labels?.first as? TextView)?.text = headline.ifBlank { "INFO KINI • infokini.news" }
+                    (labels?.second as? TextView)?.text = ticker.ifBlank { "INFO TERKINI • infokini.news" }
+                },
+                modifier = Modifier.fillMaxWidth().height(205.dp).background(Color.Black)
+            )
             ActionButton("＋ PILIH VIDEO", pickVideo, true)
         }
         CardBlock {
@@ -254,7 +290,17 @@ private fun PhotoPage(photo: Uri?, pick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         PageHeading("RUANG PRODUKSI / 02", "Editor Foto", "Pilih materi visual untuk poster dan thumbnail berita.")
         CardBlock {
-            Text(if (photo == null) "Belum ada foto dipilih." else "Foto dipilih: " + photo.lastPathSegment, color = Muted, fontSize = 12.sp)
+            if (photo == null) {
+                Text("Belum ada foto dipilih.", color = Muted, fontSize = 12.sp)
+            } else {
+                Text("PRATINJAU MATERI FOTO", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                AndroidView(factory = { ctx -> android.widget.ImageView(ctx).apply {
+                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                    setBackgroundColor(android.graphics.Color.BLACK)
+                    setImageURI(photo)
+                } }, modifier = Modifier.fillMaxWidth().height(230.dp))
+                Text(photo.lastPathSegment ?: "Foto terpilih", color = Muted, fontSize = 10.sp)
+            }
             ActionButton("＋ PILIH FOTO", pick, true)
             Text("Panel penyuntingan foto dan ekspor poster akan dibangun pada tahap editor berikutnya.", color = Gold, fontSize = 11.sp)
         }
