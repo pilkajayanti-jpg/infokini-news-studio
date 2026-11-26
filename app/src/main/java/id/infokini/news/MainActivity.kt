@@ -85,6 +85,11 @@ fun InfoKiniStudio() {
     var competition by remember { mutableStateOf("") }
     var matchTime by remember { mutableStateOf("00:00") }
     var matchStatus by remember { mutableStateOf("BELUM DIMULAI") }
+    var homeYellowCards by remember { mutableIntStateOf(0) }
+    var awayYellowCards by remember { mutableIntStateOf(0) }
+    var homeRedCards by remember { mutableIntStateOf(0) }
+    var awayRedCards by remember { mutableIntStateOf(0) }
+    var matchEvents by remember { mutableStateOf("") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             selectedMedia = uri
@@ -298,6 +303,8 @@ fun InfoKiniStudio() {
                             Text(awayTeam.ifBlank { "TIM B" }, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         }
                         Text("$matchTime  •  $matchStatus", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("KUNING $homeYellowCards | MERAH $homeRedCards     KUNING $awayYellowCards | MERAH $awayRedCards", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        if (matchEvents.isNotBlank()) Text(matchEvents, color = Color.White, fontSize = 9.sp, maxLines = 1)
                     }
                 } else if (headline.isNotBlank()) {
                     Column(Modifier.fillMaxWidth().background(Navy.copy(alpha = .92f)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -338,7 +345,31 @@ fun InfoKiniStudio() {
                         }
                     }
                 }
-                Text("Logo tim dan kompetisi akan disiapkan sebagai aset grafis pada pengembangan overlay berikutnya.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+                Text("KARTU PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(homeTeam.ifBlank { "Tim kandang" }, color = Color.White, fontSize = 11.sp)
+                        Text("Kuning: $homeYellowCards  Merah: $homeRedCards", color = Color.LightGray, fontSize = 10.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedButton(onClick = { homeYellowCards = (homeYellowCards + 1).coerceAtMost(9) }, modifier = Modifier.weight(1f)) { Text("+ Kuning") }
+                            OutlinedButton(onClick = { homeRedCards = (homeRedCards + 1).coerceAtMost(9) }, modifier = Modifier.weight(1f)) { Text("+ Merah") }
+                        }
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(awayTeam.ifBlank { "Tim tandang" }, color = Color.White, fontSize = 11.sp)
+                        Text("Kuning: $awayYellowCards  Merah: $awayRedCards", color = Color.LightGray, fontSize = 10.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedButton(onClick = { awayYellowCards = (awayYellowCards + 1).coerceAtMost(9) }, modifier = Modifier.weight(1f)) { Text("+ Kuning") }
+                            OutlinedButton(onClick = { awayRedCards = (awayRedCards + 1).coerceAtMost(9) }, modifier = Modifier.weight(1f)) { Text("+ Merah") }
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { homeYellowCards = (homeYellowCards - 1).coerceAtLeast(0); homeRedCards = (homeRedCards - 1).coerceAtLeast(0) }, modifier = Modifier.weight(1f)) { Text("Koreksi kandang") }
+                    OutlinedButton(onClick = { awayYellowCards = (awayYellowCards - 1).coerceAtLeast(0); awayRedCards = (awayRedCards - 1).coerceAtLeast(0) }, modifier = Modifier.weight(1f)) { Text("Koreksi tandang") }
+                }
+                StudioField("Catatan kejadian (gol / pergantian)", matchEvents, { matchEvents = it }, "Contoh: 32' Gol Tim A • 60' Pergantian pemain")
+                Text("Logo tim dan logo kompetisi serta timer otomatis masih memerlukan pengembangan lanjutan.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             } else if (sportsNewsMode) {
                 SportsNewsEditor()
             } else {
