@@ -124,6 +124,7 @@ fun InfoKiniStudio() {
     var projectName by remember { mutableStateOf("Proyek berita baru") }
     var savedProjectNames by remember { mutableStateOf(context.getSharedPreferences("infokini_video_projects", 0).getStringSet("project_names", emptySet())?.toList()?.sorted().orEmpty()) }
     var projectMenuExpanded by remember { mutableStateOf(false) }
+    var projectPendingDelete by remember { mutableStateOf<String?>(null) }
     val newsTemplates = listOf("Breaking News", "Berita Umum", "Olahraga", "Feature / Dokumenter", "Info Cuaca", "Wawancara")
     var selectedNewsTemplate by remember { mutableStateOf("Berita Umum") }
     var templateMenu by remember { mutableStateOf(false) }
@@ -803,6 +804,22 @@ fun InfoKiniStudio() {
                                 selectedMusicTheme = prefs.getString("${key}_music_theme", "InfoKini News Theme").orEmpty()
                                 videoStartMs = prefs.getFloat("${key}_trim_start", 0f)
                                 videoEndMs = prefs.getFloat("${key}_trim_end", 0f)
+                                videoDurationMs = 0L
+                                val restoredMedia = selectedMedia
+                                if (restoredMedia != null && context.contentResolver.getType(restoredMedia)?.startsWith("video/") == true) {
+                                    try {
+                                        val metadata = MediaMetadataRetriever()
+                                        metadata.setDataSource(context, restoredMedia)
+                                        videoDurationMs = metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                                        metadata.release()
+                                        videoStartMs = videoStartMs.coerceIn(0f, videoDurationMs.toFloat())
+                                        videoEndMs = videoEndMs.coerceIn(videoStartMs, videoDurationMs.toFloat())
+                                    } catch (_: Exception) {
+                                        Toast.makeText(context, "Media proyek tidak dapat diakses. Pilih ulang videonya.", Toast.LENGTH_LONG).show()
+                                        selectedMedia = null
+                                        mediaLabel = "Media perlu dipilih ulang"
+                                    }
+                                }
                                 reporterTopic = prefs.getString("${key}_reporter_topic", "").orEmpty()
                                 reporterSourceUrl = prefs.getString("${key}_reporter_source", "").orEmpty()
                                 reporterComparisonSourceUrl = prefs.getString("${key}_reporter_comparison", "").orEmpty()
@@ -814,9 +831,36 @@ fun InfoKiniStudio() {
                                 projectMenuExpanded = false
                                 Toast.makeText(context, "Proyek dimuat. Verifikasi dan persetujuan redaksi harus dilakukan ulang.", Toast.LENGTH_LONG).show()
                             })
+                            DropdownMenuItem(text = { Text("Hapus proyek: $savedName", color = Color(0xFFD65A5A)) }, onClick = {
+                                projectPendingDelete = savedName
+                                projectMenuExpanded = false
+                            })
                         }
                     }
                 }
+            }
+            projectPendingDelete?.let { nameToDelete ->
+                AlertDialog(
+                    onDismissRequest = { projectPendingDelete = null },
+                    title = { Text("Hapus proyek?") },
+                    text = { Text("Proyek '$nameToDelete' akan dihapus dari penyimpanan aplikasi.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val prefs = context.getSharedPreferences("infokini_video_projects", 0)
+                            val keyPrefix = "project_" + Uri.encode(nameToDelete) + "_"
+                            val editor = prefs.edit()
+                            prefs.all.keys.filter { it.startsWith(keyPrefix) }.forEach { editor.remove(it) }
+                            val remaining = savedProjectNames.filterNot { it == nameToDelete }.toSet()
+                            editor.putStringSet("project_names", remaining).apply()
+                            savedProjectNames = remaining.toList().sorted()
+                            projectPendingDelete = null
+                            Toast.makeText(context, "Proyek dihapus", Toast.LENGTH_SHORT).show()
+                        }) { Text("Hapus") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { projectPendingDelete = null }) { Text("Batal") }
+                    }
+                )
             }
             Text("PILIH TEMPLATE BERITA", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             Box {
