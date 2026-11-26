@@ -1288,7 +1288,7 @@ fun InfoKiniStudio() {
 }
 
 
-private fun isValidHttpUrl(value: String): Boolean {
+internal fun isValidHttpUrl(value: String): Boolean {
     return try {
         val parsed = URI(value.trim())
         (parsed.scheme.equals("https", ignoreCase = true) || parsed.scheme.equals("http", ignoreCase = true)) &&
@@ -1298,7 +1298,7 @@ private fun isValidHttpUrl(value: String): Boolean {
     }
 }
 
-private fun isValidIndependentSourcePair(primary: String, comparison: String): Boolean {
+internal fun isValidIndependentSourcePair(primary: String, comparison: String): Boolean {
     if (!isValidHttpUrl(primary) || !isValidHttpUrl(comparison)) return false
     return try {
         val primaryHost = URI(primary.trim()).host.lowercase(Locale.ROOT).removePrefix("www.")
