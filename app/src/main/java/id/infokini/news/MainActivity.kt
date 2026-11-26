@@ -1430,27 +1430,45 @@ fun InfoKiniStudio() {
                         modifier = Modifier.fillMaxWidth().height(220.dp)
                     )
                 } else {
-                    AndroidView(
-                        factory = { viewContext ->
-                            ImageView(viewContext).apply {
-                                scaleType = ImageView.ScaleType.FIT_CENTER
-                                setBackgroundColor(android.graphics.Color.BLACK)
-                                setImageURI(selectedMedia)
-                                colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
-                                rotation = photoRotation
-                                scaleX = if (photoFlipHorizontal) -1f else 1f
-                                scaleY = if (photoFlipVertical) -1f else 1f
+                    Box(
+                        Modifier.fillMaxWidth().height(220.dp).background(Color.Black),
+                        contentAlignment = Alignment.BottomStart
+                    ) {
+                        AndroidView(
+                            factory = { viewContext ->
+                                ImageView(viewContext).apply {
+                                    scaleType = ImageView.ScaleType.FIT_CENTER
+                                    setBackgroundColor(android.graphics.Color.BLACK)
+                                    setImageURI(selectedMedia)
+                                    colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
+                                    rotation = photoRotation
+                                    scaleX = if (photoFlipHorizontal) -1f else 1f
+                                    scaleY = if (photoFlipVertical) -1f else 1f
+                                }
+                            },
+                            update = { view ->
+                                view.setImageURI(selectedMedia)
+                                view.colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
+                                view.rotation = photoRotation
+                                view.scaleX = if (photoFlipHorizontal) -1f else 1f
+                                view.scaleY = if (photoFlipVertical) -1f else 1f
+                            },
+                            modifier = Modifier.fillMaxWidth().height(220.dp)
+                        )
+                        if (photoCaption.isNotBlank() || photoBrandWatermark) {
+                            Column(
+                                Modifier.fillMaxWidth().background(Color(0xDD080D4A)).padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                if (photoBrandWatermark) {
+                                    Text("INFOKINI.NEWS", color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                }
+                                if (photoCaption.isNotBlank()) {
+                                    Text(photoCaption, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                                }
                             }
-                        },
-                        update = { view ->
-                            view.setImageURI(selectedMedia)
-                            view.colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
-                            view.rotation = photoRotation
-                            view.scaleX = if (photoFlipHorizontal) -1f else 1f
-                            view.scaleY = if (photoFlipVertical) -1f else 1f
-                        },
-                        modifier = Modifier.fillMaxWidth().height(220.dp)
-                    )
+                        }
+                    }
                 }
             }
             if (!footballMode && !sportsNewsMode) {
