@@ -222,6 +222,29 @@ fun InfoKiniStudio() {
             .putString("clip_trims", trims.toString())
             .apply()
     }
+    var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
+    val audioPreferences = remember { context.getSharedPreferences("infokini_audio", 0) }
+    var backgroundMusicUri by remember { mutableStateOf(audioPreferences.getString("music_uri", null)?.let { Uri.parse(it) }) }
+    var backgroundMusicLabel by remember { mutableStateOf(audioPreferences.getString("music_label", null) ?: "Belum ada musik dipilih") }
+    var backgroundMusicEnabled by remember { mutableStateOf(audioPreferences.getBoolean("music_enabled", true)) }
+    var selectedMusicTheme by remember { mutableStateOf(audioPreferences.getString("music_theme", "InfoKini News Theme") ?: "InfoKini News Theme") }
+    var musicVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("music_volume", 0.25f)) }
+    var originalAudioVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("original_audio_volume", 1f)) }
+    var narrationVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("narration_volume", 1f)) }
+    var musicThemeMenu by remember { mutableStateOf(false) }
+    var photoBrightness by remember { mutableFloatStateOf(0f) }
+    var photoContrast by remember { mutableFloatStateOf(1f) }
+    var photoSaturation by remember { mutableFloatStateOf(1f) }
+    var photoRotation by remember { mutableFloatStateOf(0f) }
+    var photoFlipHorizontal by remember { mutableStateOf(false) }
+    var photoFlipVertical by remember { mutableStateOf(false) }
+    var photoCaption by remember { mutableStateOf("") }
+    var photoBrandWatermark by remember { mutableStateOf(true) }
+    var videoDurationMs by remember { mutableLongStateOf(0L) }
+    var videoStartMs by remember { mutableFloatStateOf(0f) }
+    var videoEndMs by remember { mutableFloatStateOf(0f) }
+    var previewSeekMs by remember { mutableFloatStateOf(0f) }
+    var previewVideoView by remember { mutableStateOf<VideoView?>(null) }
     LaunchedEffect(selectedMedia) {
         val mediaUri = selectedMedia
         if (mediaUri != null) {
@@ -249,29 +272,6 @@ fun InfoKiniStudio() {
             videoEndMs = 0f
         }
     }
-    var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
-    val audioPreferences = remember { context.getSharedPreferences("infokini_audio", 0) }
-    var backgroundMusicUri by remember { mutableStateOf(audioPreferences.getString("music_uri", null)?.let { Uri.parse(it) }) }
-    var backgroundMusicLabel by remember { mutableStateOf(audioPreferences.getString("music_label", null) ?: "Belum ada musik dipilih") }
-    var backgroundMusicEnabled by remember { mutableStateOf(audioPreferences.getBoolean("music_enabled", true)) }
-    var selectedMusicTheme by remember { mutableStateOf(audioPreferences.getString("music_theme", "InfoKini News Theme") ?: "InfoKini News Theme") }
-    var musicVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("music_volume", 0.25f)) }
-    var originalAudioVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("original_audio_volume", 1f)) }
-    var narrationVolume by remember { mutableFloatStateOf(audioPreferences.getFloat("narration_volume", 1f)) }
-    var musicThemeMenu by remember { mutableStateOf(false) }
-    var photoBrightness by remember { mutableFloatStateOf(0f) }
-    var photoContrast by remember { mutableFloatStateOf(1f) }
-    var photoSaturation by remember { mutableFloatStateOf(1f) }
-    var photoRotation by remember { mutableFloatStateOf(0f) }
-    var photoFlipHorizontal by remember { mutableStateOf(false) }
-    var photoFlipVertical by remember { mutableStateOf(false) }
-    var photoCaption by remember { mutableStateOf("") }
-    var photoBrandWatermark by remember { mutableStateOf(true) }
-    var videoDurationMs by remember { mutableLongStateOf(0L) }
-    var videoStartMs by remember { mutableFloatStateOf(0f) }
-    var videoEndMs by remember { mutableFloatStateOf(0f) }
-    var previewSeekMs by remember { mutableFloatStateOf(0f) }
-    var previewVideoView by remember { mutableStateOf<VideoView?>(null) }
     var videoExporting by remember { mutableStateOf(false) }
     var pendingVideoOutput by remember { mutableStateOf<Uri?>(null) }
     var live by remember { mutableStateOf(false) }
