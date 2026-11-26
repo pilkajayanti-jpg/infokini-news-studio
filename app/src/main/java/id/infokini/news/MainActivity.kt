@@ -120,6 +120,7 @@ fun InfoKiniStudio() {
     var reporterVerified by remember { mutableStateOf(false) }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("") }
+    var videoCaption by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var projectName by remember { mutableStateOf("Proyek berita baru") }
     var savedProjectNames by remember { mutableStateOf(context.getSharedPreferences("infokini_video_projects", 0).getStringSet("project_names", emptySet())?.toList()?.sorted().orEmpty()) }
@@ -270,11 +271,16 @@ fun InfoKiniStudio() {
                     }
                     val title = headline.trim()
                     val crawl = ticker.trim()
-                    if (title.isNotBlank() || crawl.isNotBlank()) {
+                    val caption = videoCaption.trim()
+                    if (title.isNotBlank() || crawl.isNotBlank() || caption.isNotBlank()) {
                         val combined = buildString {
                             if (title.isNotBlank()) append(title)
-                            if (title.isNotBlank() && crawl.isNotBlank()) append("\n")
+                            if (title.isNotBlank() && (crawl.isNotBlank() || caption.isNotBlank())) append("\\n")
                             if (crawl.isNotBlank()) append(selectedNewsTemplate.uppercase(Locale.ROOT)).append("  •  ").append(crawl)
+                            if (caption.isNotBlank()) {
+                                if (isNotEmpty()) append("\\n")
+                                append(caption)
+                            }
                         }
                         val overlayText = SpannableString(combined)
                         if (title.isNotBlank()) {
@@ -754,6 +760,7 @@ fun InfoKiniStudio() {
                         .putString("${projectKey}_project_name", safeName)
                         .putString("${projectKey}_headline", headline)
                         .putString("${projectKey}_ticker", ticker)
+                        .putString("${projectKey}_caption", videoCaption)
                         .putString("${projectKey}_location", location)
                         .putString("${projectKey}_template", selectedNewsTemplate)
                         .putString("${projectKey}_aspect", selectedAspectRatio)
@@ -793,6 +800,7 @@ fun InfoKiniStudio() {
                                 projectName = prefs.getString("${key}_project_name", savedName).orEmpty()
                                 headline = prefs.getString("${key}_headline", "").orEmpty()
                                 ticker = prefs.getString("${key}_ticker", "").orEmpty()
+                                videoCaption = prefs.getString("${key}_caption", "").orEmpty()
                                 location = prefs.getString("${key}_location", "").orEmpty()
                                 selectedNewsTemplate = prefs.getString("${key}_template", "Berita Umum").orEmpty()
                                 selectedAspectRatio = prefs.getString("${key}_aspect", "16:9 • YouTube / TV").orEmpty()
@@ -907,6 +915,7 @@ fun InfoKiniStudio() {
             Text("EDITOR BERITA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             StudioField("Judul berita", headline, { headline = it }, "Tulis judul berita...")
             StudioField("Teks berjalan", ticker, { ticker = it }, "Tulis running text...")
+            StudioField("Caption / teks narasi di video", videoCaption, { videoCaption = it }, "Tulis keterangan singkat yang tampil pada video...")
             StudioField("Lokasi berita", location, { location = it }, "Contoh: Cigombong, Kabupaten Bogor")
             }
             Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
