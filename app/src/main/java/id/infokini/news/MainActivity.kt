@@ -1475,7 +1475,7 @@ fun InfoKiniStudio() {
             }, enabled = !integrationTesting, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)) {
                 Text(if (integrationTesting) "MENGUJI KONEKSI..." else "UJI KONEKSI BACKEND")
             }
-            androidx.compose.foundation.layout.HorizontalDivider(color = Color(0xFF34415F))
+            androidx.compose.material3.Divider(color = Color(0xFF34415F))
             Text("2. PRESENTER VIRTUAL / AVATAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             StudioField("URL layanan presenter (HTTPS)", presenterBackendUrl, { presenterBackendUrl = it.trim(); context.getSharedPreferences("infokini_integrations", 0).edit().putString("presenter_url", it.trim()).apply() }, "https://server-avatar-anda.example")
             Text("Status: $presenterStatus. URL dapat disimpan, tetapi avatar dan sinkronisasi bibir baru aktif setelah penyedia layanan serta format API terintegrasi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
@@ -1483,7 +1483,7 @@ fun InfoKiniStudio() {
                 presenterStatus = if (isValidHttpsUrl(presenterBackendUrl)) "URL tersimpan; belum diuji karena format API penyedia belum ditentukan" else "URL belum valid"
                 Toast.makeText(context, presenterStatus, Toast.LENGTH_LONG).show()
             }, modifier = Modifier.fillMaxWidth()) { Text("PERIKSA URL PRESENTER") }
-            androidx.compose.foundation.layout.HorizontalDivider(color = Color(0xFF34415F))
+            androidx.compose.material3.Divider(color = Color(0xFF34415F))
             Text("3. PLATFORM SIARAN LANGSUNG", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             Text("YouTube: $youtubeStatus", color = Color(0xFFB8C4D9), fontSize = 10.sp)
             OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://studio.youtube.com/channel/"))) }, modifier = Modifier.fillMaxWidth()) { Text("SAMBUNGKAN / BUKA YOUTUBE STUDIO") }
