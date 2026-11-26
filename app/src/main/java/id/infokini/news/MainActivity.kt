@@ -128,6 +128,7 @@ fun InfoKiniStudio() {
     var aiBackendUrl by remember { mutableStateOf(context.getSharedPreferences("infokini_ai", 0).getString("backend_url", "").orEmpty()) }
     var aiGenerating by remember { mutableStateOf(false) }
     var aiBackendStatus by remember { mutableStateOf("Backend AI belum dikonfigurasi.") }
+    var aiVerificationNotes by remember { mutableStateOf("") }
     var reporterTopic by remember { mutableStateOf("") }
     var rssNewsItems by remember { mutableStateOf<List<ReporterRssItem>>(emptyList()) }
     var rssLoading by remember { mutableStateOf(false) }
@@ -953,6 +954,7 @@ fun InfoKiniStudio() {
             Text("Alur kerja redaksi: cari dan telusuri sumber, catat fakta, verifikasi silang, susun naskah video orisinal, lalu minta persetujuan redaksi. Saat ini aplikasi menyediakan alur input dan pemeriksaan manual; pemantauan otomatis lintas platform, rangkuman otomatis, dan pembuatan video AI penuh belum aktif karena membutuhkan API resmi serta backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             StudioField("Alamat Backend AI (HTTPS)", aiBackendUrl, { aiBackendUrl = it.trim(); context.getSharedPreferences("infokini_ai", 0).edit().putString("backend_url", it.trim()).apply() }, "https://alamat-server-anda.example")
             Text(aiBackendStatus, color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            if (aiVerificationNotes.isNotBlank()) Text("CATATAN PEMERIKSAAN AI: $aiVerificationNotes", color = Color(0xFFFFD27A), fontSize = 11.sp)
             StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Contoh: banjir, kebijakan publik, olahraga...")
             Text("PENCARIAN BERITA OTOMATIS • GOOGLE NEWS RSS", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             Text("Mengambil judul, waktu terbit, dan tautan berita terbaru berdasarkan topik. Ini pencarian RSS otomatis, bukan pemantauan semua platform atau verifikasi fakta otomatis.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
@@ -1101,6 +1103,7 @@ fun InfoKiniStudio() {
                             headline = generated.optString("headline", headline)
                             ticker = generated.optString("ticker", ticker)
                             reporterVideoScript = generated.optString("script", reporterVideoScript)
+                            aiVerificationNotes = generated.optString("verification_notes", "")
                             aiBackendStatus = "Draf AI dibuat. Periksa fakta dan sumber; AI tidak menggantikan verifikasi redaksi."
                         } catch (error: Exception) {
                             aiBackendStatus = "Gagal: ${error.message ?: "backend tidak dapat dihubungi"}"
