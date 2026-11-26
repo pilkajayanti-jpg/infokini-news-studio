@@ -59,6 +59,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.util.Xml
+import org.xmlpull.v1.XmlPullParser
+import java.net.URL
+import java.net.URLEncoder
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.Locale
 import java.net.URI
@@ -118,6 +124,9 @@ fun InfoKiniStudio() {
         }
     }
     var reporterTopic by remember { mutableStateOf("") }
+    var rssNewsItems by remember { mutableStateOf<List<ReporterRssItem>>(emptyList()) }
+    var rssLoading by remember { mutableStateOf(false) }
+    var rssError by remember { mutableStateOf("") }
     var reporterSourceUrl by remember { mutableStateOf("") }
     var reporterComparisonSourceUrl by remember { mutableStateOf("") }
     var reporterFacts by remember { mutableStateOf("") }
@@ -938,6 +947,46 @@ fun InfoKiniStudio() {
             Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.onGloballyPositioned { reporterSectionY = it.positionInParent().y.toInt() })
             Text("Alur kerja redaksi: cari dan telusuri sumber, catat fakta, verifikasi silang, susun naskah video orisinal, lalu minta persetujuan redaksi. Saat ini aplikasi menyediakan alur input dan pemeriksaan manual; pemantauan otomatis lintas platform, rangkuman otomatis, dan pembuatan video AI penuh belum aktif karena membutuhkan API resmi serta backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
             StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Contoh: banjir, kebijakan publik, olahraga...")
+            Text("PENCARIAN BERITA OTOMATIS • GOOGLE NEWS RSS", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("Mengambil judul, waktu terbit, dan tautan berita terbaru berdasarkan topik. Ini pencarian RSS otomatis, bukan pemantauan semua platform atau verifikasi fakta otomatis.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            Button(onClick = {
+                if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                else screenScope.launch {
+                    rssLoading = true
+                    rssError = ""
+                    try {
+                        rssNewsItems = fetchGoogleNewsRss(reporterTopic)
+                        if (rssNewsItems.isEmpty()) rssError = "Belum ada hasil. Coba kata kunci lain."
+                    } catch (_: Exception) {
+                        rssError = "Pencarian gagal. Periksa koneksi internet lalu coba lagi."
+                    } finally { rssLoading = false }
+                }
+            }, enabled = !rssLoading, modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
+            ) { Text(if (rssLoading) "MENCARI BERITA..." else "CARI BERITA TERKINI OTOMATIS", fontWeight = FontWeight.Black) }
+            if (rssError.isNotBlank()) Text(rssError, color = Color(0xFFFFB4AB), fontSize = 11.sp)
+            rssNewsItems.forEach { item ->
+                Column(Modifier.fillMaxWidth().background(Color(0xFF17243A), RoundedCornerShape(8.dp)).padding(9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(item.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    Text(item.published, color = Cyan, fontSize = 10.sp)
+                    Text(item.source, color = Color.LightGray, fontSize = 10.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            reporterSourceUrl = item.link
+                            headline = item.title.take(100)
+                            reporterApproved = false
+                            openReporterSource(context, item.link)
+                        }) { Text("BUKA SUMBER") }
+                        TextButton(onClick = {
+                            reporterSourceUrl = item.link
+                            headline = item.title.take(100)
+                            reporterTopic = item.title
+                            reporterApproved = false
+                            Toast.makeText(context, "Judul dan tautan dimasukkan ke formulir redaksi", Toast.LENGTH_SHORT).show()
+                        }) { Text("GUNAKAN TOPIK") }
+                    }
+                }
+            }
             Text("PENELUSURAN SUMBER PUBLIK", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             Text("Pilih platform untuk mencari laporan terkait topik. Hasil pencarian bukan bukti kebenaran; redaksi tetap wajib membuka sumber, memeriksa tanggal, membandingkan laporan, dan mengonfirmasi fakta.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
             val encodedReporterQuery = Uri.encode(reporterTopic)
@@ -1382,6 +1431,52 @@ fun InfoKiniStudio() {
     }
 }
 
+
+internal data class ReporterRssItem(val title: String, val link: String, val published: String, val source: String)
+
+private suspend fun fetchGoogleNewsRss(query: String): List<ReporterRssItem> = withContext(Dispatchers.IO) {
+    val encoded = URLEncoder.encode(query, "UTF-8")
+    val feedUrl = URL("https://news.google.com/rss/search?q=$encoded&hl=id&gl=ID&ceid=ID:id")
+    val connection = feedUrl.openConnection().apply {
+        connectTimeout = 12000
+        readTimeout = 12000
+        setRequestProperty("User-Agent", "InfoKiniStudio/2.3 (Android)")
+    }
+    connection.getInputStream().use { stream ->
+        val parser = Xml.newPullParser()
+        parser.setInput(stream, "UTF-8")
+        val items = mutableListOf<ReporterRssItem>()
+        var event = parser.eventType
+        var insideItem = false
+        var tag = ""
+        var title = ""; var link = ""; var published = ""; var source = ""
+        while (event != XmlPullParser.END_DOCUMENT && items.size < 15) {
+            when (event) {
+                XmlPullParser.START_TAG -> {
+                    tag = parser.name
+                    if (tag == "item") {
+                        insideItem = true
+                        title = ""; link = ""; published = ""; source = ""
+                    }
+                }
+                XmlPullParser.TEXT -> if (insideItem) when (tag) {
+                    "title" -> title += parser.text
+                    "link" -> link += parser.text
+                    "pubDate" -> published += parser.text
+                    "source" -> source += parser.text
+                }
+                XmlPullParser.END_TAG -> if (parser.name == "item" && insideItem) {
+                    if (title.isNotBlank() && link.startsWith("https://")) {
+                        items.add(ReporterRssItem(title.trim(), link.trim(), published.trim(), source.trim().ifBlank { "Google News RSS" }))
+                    }
+                    insideItem = false
+                }
+            }
+            event = parser.next()
+        }
+        items
+    }
+}
 
 internal fun safeExportFileName(value: String): String {
     val normalized = value.trim()
