@@ -20,6 +20,8 @@ import android.media.MediaMetadataRetriever
 import java.io.File
 import androidx.media3.common.MediaItem
 import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.EditedMediaItemSequence
+import androidx.media3.transformer.Composition
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
@@ -117,6 +119,9 @@ fun InfoKiniStudio() {
     var location by remember { mutableStateOf("") }
     var selectedMedia by remember { mutableStateOf<Uri?>(null) }
     var mediaLabel by remember { mutableStateOf("Belum ada foto atau video dipilih") }
+    var backgroundMusicUri by remember { mutableStateOf<Uri?>(null) }
+    var backgroundMusicLabel by remember { mutableStateOf("Belum ada musik dipilih") }
+    var backgroundMusicEnabled by remember { mutableStateOf(true) }
     var photoBrightness by remember { mutableFloatStateOf(0f) }
     var photoContrast by remember { mutableFloatStateOf(1f) }
     var photoSaturation by remember { mutableFloatStateOf(1f) }
@@ -188,6 +193,14 @@ fun InfoKiniStudio() {
             }
         }
     }
+    val musicPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
+            backgroundMusicUri = uri
+            backgroundMusicLabel = uri.lastPathSegment ?: "Musik latar dipilih"
+            backgroundMusicEnabled = true
+        }
+    }
     val homeLogoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
         keepLogoPermission(it); homeLogoUri = it
     }
@@ -246,6 +259,15 @@ fun InfoKiniStudio() {
                         Effects(emptyList(), emptyList())
                     }
                     val editedItem = EditedMediaItem.Builder(mediaItem).setEffects(effects).build()
+                    val composition = if (backgroundMusicEnabled && backgroundMusicUri != null) {
+                        val videoSequence = EditedMediaItemSequence.withAudioAndVideoFrom(listOf(editedItem))
+                        val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(backgroundMusicUri!!)).build()
+                        val musicSequence = EditedMediaItemSequence.withAudioFrom(listOf(musicItem))
+                            .buildUpon().setIsLooping(true).build()
+                        Composition.Builder(videoSequence, musicSequence).build()
+                    } else {
+                        Composition.Builder(EditedMediaItemSequence.withAudioAndVideoFrom(listOf(editedItem))).build()
+                    }
                     val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
                     val transformer = Transformer.Builder(context)
                         .addListener(object : Transformer.Listener {
@@ -275,7 +297,7 @@ fun InfoKiniStudio() {
                             }
                         })
                         .build()
-                    transformer.start(editedItem, outputFile.absolutePath)
+                    transformer.start(composition, outputFile.absolutePath)
                 } catch (error: Exception) {
                     videoExporting = false
                     pendingVideoOutput = null
@@ -696,6 +718,31 @@ fun InfoKiniStudio() {
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
             ) { Text("PILIH FOTO / VIDEO DARI HP") }
             Text(mediaLabel, color = Color.LightGray, fontSize = 12.sp)
+
+            Text("MUSIK LATAR BERITA", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text("Pilih musik dari perangkat. Musik akan diulang mengikuti durasi video saat ekspor MP4.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+            OutlinedButton(onClick = { musicPicker.launch(arrayOf("audio/*")) }, modifier = Modifier.fillMaxWidth()) {
+                Text("PILIH MUSIK LATAR (MP3 / AUDIO)")
+            }
+            Text(backgroundMusicLabel, color = Color.LightGray, fontSize = 11.sp)
+            if (backgroundMusicUri != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = backgroundMusicEnabled, onCheckedChange = { backgroundMusicEnabled = it })
+                    Text("Sertakan musik saat ekspor MP4", color = Color.White, fontSize = 12.sp)
+                }
+                OutlinedButton(onClick = { backgroundMusicUri = null; backgroundMusicLabel = "Belum ada musik dipilih" }, modifier = Modifier.fillMaxWidth()) {
+                    Text("HAPUS PILIHAN MUSIK")
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/audiolibrary"))) }, modifier = Modifier.weight(1f)) {
+                    Text("YouTube Audio Library")
+                }
+                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://pixabay.com/music/"))) }, modifier = Modifier.weight(1f)) {
+                    Text("Pixabay Music")
+                }
+            }
+            Text("Periksa lisensi setiap lagu sebelum dipakai. Gunakan filter 'Attribution not required' bila tidak ingin mencantumkan kredit; lagu Creative Commons wajib diberi atribusi sesuai syarat. Pastikan lisensi mengizinkan penggunaan komersial jika konten dimonetisasi.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
 
             if (selectedMedia != null && context.contentResolver.getType(selectedMedia!!)?.startsWith("image/") == true) {
                 Text("EDITOR FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
