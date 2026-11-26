@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 private val Navy = Color(0xFF080D4A)
 private val Cyan = Color(0xFF13BDEB)
@@ -90,6 +91,15 @@ fun InfoKiniStudio() {
     var homeRedCards by remember { mutableIntStateOf(0) }
     var awayRedCards by remember { mutableIntStateOf(0) }
     var matchEvents by remember { mutableStateOf("") }
+    var matchClockRunning by remember { mutableStateOf(false) }
+    var matchElapsedSeconds by remember { mutableIntStateOf(0) }
+    LaunchedEffect(matchClockRunning) {
+        while (matchClockRunning) {
+            delay(1000)
+            matchElapsedSeconds += 1
+            matchTime = String.format(Locale.US, "%02d:%02d", matchElapsedSeconds / 60, matchElapsedSeconds % 60)
+        }
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             selectedMedia = uri
@@ -333,7 +343,19 @@ fun InfoKiniStudio() {
                 StudioField("Skor tim kandang", homeScore, { homeScore = it.filter { ch -> ch.isDigit() }.take(2) }, "0")
                 StudioField("Nama tim tandang", awayTeam, { awayTeam = it }, "Nama tim B")
                 StudioField("Skor tim tandang", awayScore, { awayScore = it.filter { ch -> ch.isDigit() }.take(2) }, "0")
-                StudioField("Waktu pertandingan", matchTime, { matchTime = it }, "Contoh: 45+2'")
+                Text("JAM PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(matchTime, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { matchClockRunning = !matchClockRunning }, modifier = Modifier.weight(1f)) {
+                        Text(if (matchClockRunning) "JEDA JAM" else "MULAI JAM")
+                    }
+                    OutlinedButton(onClick = {
+                        matchClockRunning = false
+                        matchElapsedSeconds = 0
+                        matchTime = "00:00"
+                    }, modifier = Modifier.weight(1f)) { Text("RESET") }
+                }
+                StudioField("Koreksi waktu / tambahan", matchTime, { matchTime = it }, "Contoh: 45+2'")
                 var expandedStatus by remember { mutableStateOf(false) }
                 Box {
                     OutlinedButton(onClick = { expandedStatus = true }, modifier = Modifier.fillMaxWidth()) {
