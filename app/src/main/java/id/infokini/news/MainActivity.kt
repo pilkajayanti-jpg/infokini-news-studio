@@ -144,6 +144,11 @@ fun InfoKiniStudio() {
     var live by remember { mutableStateOf(false) }
     var footballMode by remember { mutableStateOf(false) }
     var sportsNewsMode by remember { mutableStateOf(false) }
+    var sportType by remember { mutableStateOf("Sepak Bola") }
+    var sportTypeMenu by remember { mutableStateOf(false) }
+    var matchRound by remember { mutableStateOf("") }
+    var matchVenue by remember { mutableStateOf("") }
+    var matchReferee by remember { mutableStateOf("") }
     var homeTeam by remember { mutableStateOf("") }
     var awayTeam by remember { mutableStateOf("") }
     var homeScore by remember { mutableStateOf("0") }
@@ -604,6 +609,17 @@ fun InfoKiniStudio() {
             }
             if (footballMode) {
                 Text("PENGATURAN SKOR PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Box {
+                    OutlinedButton(onClick = { sportTypeMenu = true }, modifier = Modifier.fillMaxWidth()) { Text("Cabang olahraga: $sportType") }
+                    DropdownMenu(expanded = sportTypeMenu, onDismissRequest = { sportTypeMenu = false }) {
+                        listOf("Sepak Bola", "Futsal", "Basket", "Bulu Tangkis", "Voli", "Balap").forEach { type ->
+                            DropdownMenuItem(text = { Text(type) }, onClick = { sportType = type; sportTypeMenu = false })
+                        }
+                    }
+                }
+                StudioField("Babak / pekan", matchRound, { matchRound = it }, "Contoh: Final / Pekan 12")
+                StudioField("Lokasi pertandingan", matchVenue, { matchVenue = it }, "Stadion / arena")
+                StudioField("Wasit / ofisial (opsional)", matchReferee, { matchReferee = it }, "Nama ofisial")
                 StudioField("Kompetisi / nama pertandingan", competition, { competition = it }, "Contoh: Liga 1 Indonesia")
                 StudioField("Nama tim kandang", homeTeam, { homeTeam = it }, "Nama tim A")
                 StudioField("Skor tim kandang", homeScore, { homeScore = it.filter { ch -> ch.isDigit() }.take(2) }, "0")
@@ -680,7 +696,9 @@ fun InfoKiniStudio() {
                             .putInt("elapsed", matchElapsedSeconds)
                             .putInt("homeYellow", homeYellowCards).putInt("awayYellow", awayYellowCards)
                             .putInt("homeRed", homeRedCards).putInt("awayRed", awayRedCards)
-                            .putString("events", matchEvents).apply()
+                            .putString("events", matchEvents)
+                            .putString("sportType", sportType).putString("matchRound", matchRound)
+                            .putString("matchVenue", matchVenue).putString("matchReferee", matchReferee).apply()
                         Toast.makeText(context, "Data pertandingan tersimpan", Toast.LENGTH_SHORT).show()
                     }, modifier = Modifier.weight(1f)) { Text("Simpan laga") }
                     OutlinedButton(onClick = {
@@ -701,6 +719,10 @@ fun InfoKiniStudio() {
                         homeRedCards = prefs.getInt("homeRed", 0)
                         awayRedCards = prefs.getInt("awayRed", 0)
                         matchEvents = prefs.getString("events", "").orEmpty()
+                        sportType = prefs.getString("sportType", "Sepak Bola") ?: "Sepak Bola"
+                        matchRound = prefs.getString("matchRound", "").orEmpty()
+                        matchVenue = prefs.getString("matchVenue", "").orEmpty()
+                        matchReferee = prefs.getString("matchReferee", "").orEmpty()
                         matchClockRunning = false
                         Toast.makeText(context, "Data pertandingan dimuat", Toast.LENGTH_SHORT).show()
                     }, modifier = Modifier.weight(1f)) { Text("Muat laga") }
