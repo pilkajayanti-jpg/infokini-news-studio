@@ -14,13 +14,13 @@ InfoKini Studio adalah studio produksi konten berita untuk membantu pengguna men
 - Editor foto dengan kontrol kecerahan, kontras, saturasi, rotasi, flip horizontal/vertikal, teks/caption, opsi watermark InfoKini, simpan/muat setelan, dan ekspor foto/poster.
 - Text-to-Speech Android untuk membacakan naskah berbahasa Indonesia, dengan pilihan suara yang tersedia di perangkat dan gaya penyampaian.
 - Modul Reporter/Redaktur berbasis alur kerja manual: pencarian topik melalui tautan publik, pencatatan dua URL sumber, fakta/naskah, penandaan verifikasi, penyimpanan draf, dan persetujuan redaksi sebelum materi Reporter disiapkan untuk video. Persetujuan memerlukan dua URL HTTP(S) berbeda, tetapi aplikasi belum memeriksa apakah penerbitnya benar-benar independen atau isi laporannya saling menguatkan.
-- Pintasan penelusuran topik ke Google News, Bing News, YouTube, TikTok, Facebook, X, Instagram melalui pencarian web, Reddit, dan Google Trends. Tautan tersebut membuka layanan eksternal; aplikasi tidak memantau atau mengambil data platform secara otomatis.
+- Pencarian berita otomatis berdasarkan topik melalui Google News RSS, menampilkan hingga 15 judul, tanggal terbit, penerbit, dan tautan sumber; pengguna dapat membuka sumber asli atau memasukkan judul/tautan ke formulir redaksi. Ini bukan pemantauan semua platform atau verifikasi fakta otomatis.\n- Pintasan penelusuran topik ke Bing News, YouTube, TikTok, Facebook, X, Instagram melalui pencarian web, Reddit, dan Google Trends.
 - Grafis skor pertandingan dengan pengisian data manual dan ekspor grafis.
 - Kredit “Powered by Wandi Azis” pada antarmuka aplikasi.
 
 ## Belum tersedia / membutuhkan pekerjaan lanjutan
 
-- Pemantauan berita viral otomatis lintas platform, pengambilan data terjadwal, dan analisis tren berbasis API.
+- Pemantauan berita viral otomatis lintas platform, pengambilan data terjadwal, dan analisis tren berbasis API. Pencarian Google News RSS per topik sudah tersedia, tetapi bukan pemantauan terjadwal.
 - AI Redaktur yang benar-benar menghasilkan naskah/video secara otomatis, pemeriksaan fakta otomatis, dan integrasi model AI.
 - Presenter virtual dengan karakter fiktif orisinal, animasi, dan sinkronisasi gerak bibir.
 - Paket musik original InfoKini yang diproduksi khusus dan disertai dokumentasi hak penggunaan. Musik yang dipilih sendiri oleh pengguna harus memiliki lisensi yang sesuai.
