@@ -9,6 +9,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.RectF
+import android.graphics.Matrix
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.speech.tts.TextToSpeech
@@ -71,6 +72,7 @@ fun InfoKiniStudio() {
     var photoBrightness by remember { mutableFloatStateOf(0f) }
     var photoContrast by remember { mutableFloatStateOf(1f) }
     var photoSaturation by remember { mutableFloatStateOf(1f) }
+    var photoRotation by remember { mutableFloatStateOf(0f) }
     var videoDurationMs by remember { mutableLongStateOf(0L) }
     var videoStartMs by remember { mutableFloatStateOf(0f) }
     var videoEndMs by remember { mutableFloatStateOf(0f) }
@@ -338,11 +340,14 @@ fun InfoKiniStudio() {
                 try {
                     val source = context.contentResolver.openInputStream(sourceUri)?.use { BitmapFactory.decodeStream(it) }
                         ?: throw IllegalStateException("Foto tidak dapat dibaca")
-                    val edited = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+                    val rotateMatrix = Matrix().apply { postRotate(photoRotation) }
+                    val rotated = Bitmap.createBitmap(source, 0, 0, source.width, source.height, rotateMatrix, true)
+                    val edited = Bitmap.createBitmap(rotated.width, rotated.height, Bitmap.Config.ARGB_8888)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
                         colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
                     }
-                    Canvas(edited).drawBitmap(source, 0f, 0f, paint)
+                    Canvas(edited).drawBitmap(rotated, 0f, 0f, paint)
+                    if (rotated !== source) rotated.recycle()
                     val stream = context.contentResolver.openOutputStream(outputUri)
                         ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka")
                     stream.use {
@@ -564,11 +569,14 @@ fun InfoKiniStudio() {
                 Slider(value = photoContrast, onValueChange = { photoContrast = it }, valueRange = 0.5f..1.8f)
                 Text("Saturasi: ${"%.1f".format(Locale.US, photoSaturation)}", color = Color.White, fontSize = 12.sp)
                 Slider(value = photoSaturation, onValueChange = { photoSaturation = it }, valueRange = 0f..2f)
+                Text("Rotasi: ${photoRotation.toInt()}°", color = Color.White, fontSize = 12.sp)
+                Slider(value = photoRotation, onValueChange = { photoRotation = it }, valueRange = -180f..180f)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         photoBrightness = 0f
                         photoContrast = 1f
                         photoSaturation = 1f
+                        photoRotation = 0f
                     }, modifier = Modifier.weight(1f)) { Text("Atur ulang") }
                     Button(onClick = { photoExporter.launch("InfoKini-Foto-Edit.jpg") }, modifier = Modifier.weight(1f)) {
                         Text("SIMPAN FOTO EDIT")
@@ -636,11 +644,13 @@ fun InfoKiniStudio() {
                                 setBackgroundColor(android.graphics.Color.BLACK)
                                 setImageURI(selectedMedia)
                                 colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
+                                rotation = photoRotation
                             }
                         },
                         update = { view ->
                             view.setImageURI(selectedMedia)
                             view.colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
+                            view.rotation = photoRotation
                         },
                         modifier = Modifier.fillMaxWidth().height(220.dp)
                     )
