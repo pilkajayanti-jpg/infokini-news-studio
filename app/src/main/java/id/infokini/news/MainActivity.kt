@@ -764,6 +764,7 @@ fun InfoKiniStudio() {
                         .putString("reporter_comparison", reporterComparisonSourceUrl)
                         .putString("reporter_facts", reporterFacts)
                         .putString("reporter_script", reporterVideoScript)
+                        .putBoolean("reporter_material_applied", reporterMaterialAppliedToVideo)
                         .putLong("saved_at", System.currentTimeMillis())
                         .apply()
                     Toast.makeText(context, "Proyek video tersimpan di perangkat", Toast.LENGTH_SHORT).show()
@@ -794,7 +795,7 @@ fun InfoKiniStudio() {
                         reporterVideoScript = prefs.getString("reporter_script", "").orEmpty()
                         reporterVerified = false
                         reporterApproved = false
-                        reporterMaterialAppliedToVideo = false
+                        reporterMaterialAppliedToVideo = prefs.getBoolean("reporter_material_applied", false)
                         Toast.makeText(context, "Proyek dimuat. Verifikasi dan persetujuan redaksi harus dilakukan ulang.", Toast.LENGTH_LONG).show()
                     }
                 }, modifier = Modifier.weight(1f)) { Text("Muat proyek") }
