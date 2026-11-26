@@ -3,6 +3,8 @@ package id.infokini.news
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -13,6 +15,7 @@ import android.graphics.Matrix
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.widget.Toast
 import android.widget.ImageView
 import android.widget.VideoView
@@ -108,6 +111,8 @@ fun InfoKiniStudio() {
     var reporterSectionY by remember { mutableIntStateOf(0) }
     var photoSectionY by remember { mutableIntStateOf(0) }
     var ttsReady by remember { mutableStateOf(false) }
+    var narrationAudioFile by remember { mutableStateOf<File?>(null) }
+    var narrationGenerating by remember { mutableStateOf(false) }
     var ttsVoiceNames by remember { mutableStateOf(listOf("Default Android")) }
     var selectedTtsVoice by remember { mutableStateOf("Default Android") }
     var ttsVoiceMenu by remember { mutableStateOf(false) }
@@ -386,17 +391,22 @@ fun InfoKiniStudio() {
                         val clipItem = EditedMediaItem.Builder(clipMediaItem).setEffects(effects).build()
                         editedItems.add(clipItem)
                     }
-                    val composition = if (backgroundMusicEnabled && backgroundMusicUri != null) {
-                        val videoSequence = EditedMediaItemSequence.withAudioAndVideoFrom(editedItems)
+                    val compositionSequences = mutableListOf<EditedMediaItemSequence>()
+                    compositionSequences.add(EditedMediaItemSequence.withAudioAndVideoFrom(editedItems))
+                    if (backgroundMusicEnabled && backgroundMusicUri != null) {
                         val musicAudioProcessor = GainProcessor(DefaultGainProvider.Builder(musicVolume.coerceIn(0f, 1f)).build())
                         val musicEffects = Effects(listOf(musicAudioProcessor), emptyList())
                         val musicItem = EditedMediaItem.Builder(MediaItem.fromUri(backgroundMusicUri!!)).setEffects(musicEffects).build()
-                        val musicSequence = EditedMediaItemSequence.withAudioFrom(listOf(musicItem))
-                            .buildUpon().setIsLooping(true).build()
-                        Composition.Builder(videoSequence, musicSequence).build()
-                    } else {
-                        Composition.Builder(EditedMediaItemSequence.withAudioAndVideoFrom(editedItems)).build()
+                        compositionSequences.add(
+                            EditedMediaItemSequence.withAudioFrom(listOf(musicItem))
+                                .buildUpon().setIsLooping(true).build()
+                        )
                     }
+                    narrationAudioFile?.takeIf { it.exists() && it.length() > 0L }?.let { narrationFile ->
+                        val narrationItem = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narrationFile))).build()
+                        compositionSequences.add(EditedMediaItemSequence.withAudioFrom(listOf(narrationItem)))
+                    }
+                    val composition = Composition.Builder(compositionSequences).build()
                     val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
                     val transformer = Transformer.Builder(context)
                         .addListener(object : Transformer.Listener {
@@ -1683,6 +1693,54 @@ fun InfoKiniStudio() {
                     }, modifier = Modifier.weight(1f)) { Text("Bacakan naskah") }
                 }
             }
+            OutlinedButton(
+                onClick = {
+                    val script = listOf(headline.trim(), ticker.trim(), videoCaption.trim())
+                        .filter { it.isNotBlank() }.joinToString(". ")
+                    if (!ttsReady) {
+                        Toast.makeText(context, "Mesin suara Android belum siap", Toast.LENGTH_SHORT).show()
+                    } else if (script.isBlank()) {
+                        Toast.makeText(context, "Isi judul, teks berjalan, atau naskah terlebih dahulu", Toast.LENGTH_SHORT).show()
+                    } else if (narrationGenerating) {
+                        Toast.makeText(context, "Audio narator sedang dibuat", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val narrationFile = File(context.cacheDir, "infokini-narration-${System.currentTimeMillis()}.wav")
+                        tts.language = Locale("id", "ID")
+                        tts.voices?.firstOrNull { it.name == selectedTtsVoice }?.let { tts.voice = it }
+                        applyNarrationStyle()
+                        narrationGenerating = true
+                        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                            override fun onStart(utteranceId: String?) {}
+                            override fun onDone(utteranceId: String?) {
+                                Handler(Looper.getMainLooper()).post {
+                                    narrationAudioFile = narrationFile
+                                    narrationGenerating = false
+                                    Toast.makeText(context, "Audio narator siap dan akan disertakan saat ekspor MP4", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                            override fun onError(utteranceId: String?) {
+                                Handler(Looper.getMainLooper()).post {
+                                    narrationGenerating = false
+                                    narrationFile.delete()
+                                    Toast.makeText(context, "Gagal membuat audio narator", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        })
+                        val result = tts.synthesizeToFile(script, Bundle(), narrationFile, "infokini-export-narration")
+                        if (result != TextToSpeech.SUCCESS) {
+                            narrationGenerating = false
+                            narrationFile.delete()
+                            Toast.makeText(context, "Perangkat tidak dapat membuat file suara narator", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                enabled = !narrationGenerating,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(if (narrationGenerating) "MEMBUAT AUDIO NARATOR..." else "BUAT AUDIO NARATOR UNTUK MP4") }
+            Text(
+                if (narrationAudioFile?.exists() == true) "Audio narator siap untuk ekspor MP4." else "Buat audio narator terlebih dahulu agar suara masuk ke dalam video hasil ekspor.",
+                color = Color(0xFFB8C4D9), fontSize = 11.sp
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Tampilkan label LIVE pada pratinjau", color = Color.White, modifier = Modifier.weight(1f))
                 Switch(checked = live, onCheckedChange = { live = it })
