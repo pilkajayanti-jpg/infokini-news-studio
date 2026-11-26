@@ -77,6 +77,12 @@ fun InfoKiniStudio() {
     var ttsVoiceNames by remember { mutableStateOf(listOf("Default Android")) }
     var selectedTtsVoice by remember { mutableStateOf("Default Android") }
     var ttsVoiceMenu by remember { mutableStateOf(false) }
+    var aiPresenterEnabled by remember { mutableStateOf(false) }
+    var presenterStyle by remember { mutableStateOf("Presenter Pria") }
+    var presenterMenu by remember { mutableStateOf(false) }
+    var deliveryStyle by remember { mutableStateOf("Formal / Berita") }
+    var deliveryMenu by remember { mutableStateOf(false) }
+    val deliveryStyles = listOf("Formal / Berita", "Santai / Akrab", "Breaking News", "Dokumenter", "Semangat / Olahraga")
     val tts = remember {
         TextToSpeech(context) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
@@ -91,6 +97,15 @@ fun InfoKiniStudio() {
         }
     }
     DisposableEffect(tts) { onDispose { tts.stop(); tts.shutdown() } }
+    fun applyNarrationStyle() {
+        when (deliveryStyle) {
+            "Santai / Akrab" -> { tts.setSpeechRate(1.02f); tts.setPitch(1.04f) }
+            "Breaking News" -> { tts.setSpeechRate(1.12f); tts.setPitch(1.02f) }
+            "Dokumenter" -> { tts.setSpeechRate(0.88f); tts.setPitch(0.96f) }
+            "Semangat / Olahraga" -> { tts.setSpeechRate(1.08f); tts.setPitch(1.10f) }
+            else -> { tts.setSpeechRate(0.94f); tts.setPitch(1.0f) }
+        }
+    }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
@@ -794,6 +809,32 @@ fun InfoKiniStudio() {
                 }
             }
             if (!footballMode && !sportsNewsMode) {
+                Text("NARATOR & PEMBAWA ACARA AI", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Aktifkan mode pembawa acara", color = Color.White, modifier = Modifier.weight(1f))
+                    Switch(checked = aiPresenterEnabled, onCheckedChange = { aiPresenterEnabled = it })
+                }
+                if (aiPresenterEnabled) {
+                    Text("Karakter pembawa acara", color = Color.White, fontSize = 12.sp)
+                    Box {
+                        OutlinedButton(onClick = { presenterMenu = true }, modifier = Modifier.fillMaxWidth()) { Text(presenterStyle) }
+                        DropdownMenu(expanded = presenterMenu, onDismissRequest = { presenterMenu = false }) {
+                            listOf("Presenter Pria", "Presenter Wanita").forEach { option ->
+                                DropdownMenuItem(text = { Text(option) }, onClick = { presenterStyle = option; presenterMenu = false })
+                            }
+                        }
+                    }
+                    Text("Gaya penyampaian narator", color = Color.White, fontSize = 12.sp)
+                    Box {
+                        OutlinedButton(onClick = { deliveryMenu = true }, modifier = Modifier.fillMaxWidth()) { Text(deliveryStyle) }
+                        DropdownMenu(expanded = deliveryMenu, onDismissRequest = { deliveryMenu = false }) {
+                            deliveryStyles.forEach { option ->
+                                DropdownMenuItem(text = { Text(option) }, onClick = { deliveryStyle = option; deliveryMenu = false })
+                            }
+                        }
+                    }
+                    Text("Avatar realistis dan gerak bibir sinkron memerlukan integrasi layanan AI avatar; pilihan ini saat ini mengatur karakter dan gaya narasi.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         context.getSharedPreferences("infokini_studio", 0).edit()
@@ -834,7 +875,11 @@ fun InfoKiniStudio() {
                         if (ttsReady) {
                             tts.language = Locale("id", "ID")
                             tts.voices?.firstOrNull { it.name == selectedTtsVoice }?.let { tts.voice = it }
-                            tts.speak("$headline. $ticker", TextToSpeech.QUEUE_FLUSH, null, "infokini-news-script")
+                            applyNarrationStyle()
+                            val presenterIntro = if (aiPresenterEnabled) {
+                                if (presenterStyle == "Presenter Wanita") "Pemirsa, berikut informasi InfoKini. " else "Pemirsa, berikut informasi terkini InfoKini. "
+                            } else ""
+                            tts.speak(presenterIntro + "$headline. $ticker", TextToSpeech.QUEUE_FLUSH, null, "infokini-news-script")
                         } else {
                             Toast.makeText(context, "Mesin suara Android belum siap", Toast.LENGTH_SHORT).show()
                         }
