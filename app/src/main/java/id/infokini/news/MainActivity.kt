@@ -15,6 +15,13 @@ import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import android.widget.ImageView
 import android.widget.VideoView
+import android.media.MediaMetadataRetriever
+import java.io.File
+import androidx.media3.common.MediaItem
+import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.ExportException
+import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.Transformer
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -63,6 +70,11 @@ fun InfoKiniStudio() {
     var photoBrightness by remember { mutableFloatStateOf(0f) }
     var photoContrast by remember { mutableFloatStateOf(1f) }
     var photoSaturation by remember { mutableFloatStateOf(1f) }
+    var videoDurationMs by remember { mutableLongStateOf(0L) }
+    var videoStartMs by remember { mutableFloatStateOf(0f) }
+    var videoEndMs by remember { mutableFloatStateOf(0f) }
+    var videoExporting by remember { mutableStateOf(false) }
+    var pendingVideoOutput by remember { mutableStateOf<Uri?>(null) }
     var live by remember { mutableStateOf(false) }
     var footballMode by remember { mutableStateOf(false) }
     var sportsNewsMode by remember { mutableStateOf(false) }
@@ -77,8 +89,82 @@ fun InfoKiniStudio() {
         if (uri != null) {
             selectedMedia = uri
             mediaLabel = uri.lastPathSegment ?: "Media dipilih"
+            videoDurationMs = 0L
+            videoStartMs = 0f
+            videoEndMs = 0f
+            if (context.contentResolver.getType(uri)?.startsWith("video/") == true) {
+                try {
+                    val metadata = MediaMetadataRetriever()
+                    metadata.setDataSource(context, uri)
+                    videoDurationMs = metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                    videoEndMs = videoDurationMs.toFloat()
+                    metadata.release()
+                } catch (_: Exception) {
+                    Toast.makeText(context, "Durasi video tidak dapat dibaca", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
+
+    val videoExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { outputUri ->
+        if (outputUri != null) {
+            val sourceUri = selectedMedia
+            if (sourceUri == null || videoDurationMs <= 0L) {
+                Toast.makeText(context, "Pilih video yang valid terlebih dahulu", Toast.LENGTH_LONG).show()
+            } else if (videoEndMs.toLong() <= videoStartMs.toLong()) {
+                Toast.makeText(context, "Waktu akhir harus lebih besar dari waktu awal", Toast.LENGTH_LONG).show()
+            } else {
+                try {
+                    videoExporting = true
+                    pendingVideoOutput = outputUri
+                    val clipping = MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(videoStartMs.toLong())
+                        .setEndPositionMs(videoEndMs.toLong())
+                        .build()
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(sourceUri)
+                        .setClippingConfiguration(clipping)
+                        .build()
+                    val editedItem = EditedMediaItem.Builder(mediaItem).build()
+                    val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
+                    val transformer = Transformer.Builder(context)
+                        .addListener(object : Transformer.Listener {
+                            override fun onCompleted(composition: androidx.media3.transformer.Composition, exportResult: ExportResult) {
+                                try {
+                                    val destination = pendingVideoOutput ?: throw IllegalStateException("Lokasi simpan hilang")
+                                    context.contentResolver.openOutputStream(destination)?.use { out ->
+                                        outputFile.inputStream().use { input -> input.copyTo(out) }
+                                    } ?: throw IllegalStateException("File tujuan tidak dapat dibuka")
+                                    outputFile.delete()
+                                    videoExporting = false
+                                    pendingVideoOutput = null
+                                    Toast.makeText(context, "Video MP4 berhasil diekspor", Toast.LENGTH_LONG).show()
+                                } catch (error: Exception) {
+                                    outputFile.delete()
+                                    videoExporting = false
+                                    pendingVideoOutput = null
+                                    Toast.makeText(context, "Gagal menyimpan MP4: ${error.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+
+                            override fun onError(composition: androidx.media3.transformer.Composition, exportResult: ExportResult, exportException: ExportException) {
+                                outputFile.delete()
+                                videoExporting = false
+                                pendingVideoOutput = null
+                                Toast.makeText(context, "Ekspor video gagal: ${exportException.message}", Toast.LENGTH_LONG).show()
+                            }
+                        })
+                        .build()
+                    transformer.start(editedItem, outputFile.absolutePath)
+                } catch (error: Exception) {
+                    videoExporting = false
+                    pendingVideoOutput = null
+                    Toast.makeText(context, "Tidak dapat memulai ekspor: ${error.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     val posterExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { outputUri ->
         if (outputUri != null) {
             val sourceUri = selectedMedia
@@ -299,6 +385,31 @@ fun InfoKiniStudio() {
                 val isVideo = context.contentResolver.getType(selectedMedia!!)?.startsWith("video/") == true
                 Text(if (isVideo) "PRATINJAU VIDEO" else "PRATINJAU FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 if (isVideo) {
+                    Text("EDITOR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    if (videoDurationMs > 0L) {
+                        Text("Durasi: ${videoDurationMs / 1000}s", color = Color.White, fontSize = 12.sp)
+                        Text("Mulai: ${(videoStartMs / 1000f).toInt()} detik", color = Color.White, fontSize = 12.sp)
+                        Slider(
+                            value = videoStartMs,
+                            onValueChange = { videoStartMs = it.coerceAtMost(videoEndMs - 1000f) },
+                            valueRange = 0f..(videoDurationMs - 1000L).coerceAtLeast(0L).toFloat()
+                        )
+                        Text("Akhir: ${(videoEndMs / 1000f).toInt()} detik", color = Color.White, fontSize = 12.sp)
+                        Slider(
+                            value = videoEndMs,
+                            onValueChange = { videoEndMs = it.coerceAtLeast(videoStartMs + 1000f) },
+                            valueRange = 1000f..videoDurationMs.toFloat()
+                        )
+                        Button(
+                            onClick = { videoExporter.launch("InfoKini-Video-Edit.mp4") },
+                            enabled = !videoExporting,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Navy)
+                        ) { Text(if (videoExporting) "SEDANG EKSPOR..." else "POTONG & EKSPOR MP4", fontWeight = FontWeight.Black) }
+                        Text("Video diproses di perangkat. Lama proses bergantung pada durasi, resolusi, dan kemampuan HP.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
+                    } else {
+                        Text("Durasi video belum terbaca. Coba pilih file video lain.", color = Color.LightGray, fontSize = 11.sp)
+                    }
                     AndroidView(
                         factory = { viewContext ->
                             VideoView(viewContext).apply {
