@@ -28,6 +28,7 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.Effects
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.Presentation
 import androidx.media3.effect.TextOverlay
 import androidx.media3.effect.TextureOverlay
 import android.text.SpannableString
@@ -274,11 +275,16 @@ fun InfoKiniStudio() {
                         }
                         videoOverlays.add(TextOverlay.createStaticTextOverlay(overlayText))
                     }
-                    val effects = if (videoOverlays.isNotEmpty()) {
-                        Effects(emptyList(), listOf(OverlayEffect(videoOverlays)))
-                    } else {
-                        Effects(emptyList(), emptyList())
+                    val targetAspectRatio = if (selectedAspectRatio.startsWith("9:16")) 9f / 16f else 16f / 9f
+                    val aspectPresentation = Presentation.createForAspectRatio(
+                        targetAspectRatio,
+                        Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
+                    )
+                    val videoEffects = mutableListOf<androidx.media3.common.Effect>(aspectPresentation)
+                    if (videoOverlays.isNotEmpty()) {
+                        videoEffects.add(OverlayEffect(videoOverlays))
                     }
+                    val effects = Effects(emptyList(), videoEffects)
                     val editedItem = EditedMediaItem.Builder(mediaItem).setEffects(effects).build()
                     val composition = if (backgroundMusicEnabled && backgroundMusicUri != null) {
                         val videoSequence = EditedMediaItemSequence.withAudioAndVideoFrom(listOf(editedItem))
