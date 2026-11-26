@@ -1106,7 +1106,7 @@ fun InfoKiniStudio() {
                             aiVerificationNotes = generated.optString("verification_notes", "")
                             aiBackendStatus = "Draf AI dibuat. Periksa fakta dan sumber; AI tidak menggantikan verifikasi redaksi."
                         } catch (error: Exception) {
-                            aiBackendStatus = "Gagal: ${error.message ?: "backend tidak dapat dihubungi"}"
+                            aiBackendStatus = "Gagal: " + (error.message ?: "backend tidak dapat dihubungi")
                         } finally { aiGenerating = false }
                     }
                 }
