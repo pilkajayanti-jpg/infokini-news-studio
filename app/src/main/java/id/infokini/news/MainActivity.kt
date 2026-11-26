@@ -786,11 +786,49 @@ fun InfoKiniStudio() {
             }
             Text("AI REPORTER & REDAKTUR VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Text("Alur kerja redaksi: cari dan telusuri sumber, catat fakta, verifikasi silang, susun naskah video orisinal, lalu minta persetujuan redaksi. Saat ini aplikasi menyediakan alur input dan pemeriksaan manual; pemantauan otomatis lintas platform, rangkuman otomatis, dan pembuatan video AI penuh belum aktif karena membutuhkan API resmi serta backend.", color = Color(0xFFB8C4D9), fontSize = 11.sp)
-            OutlinedButton(onClick = {
-                if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
-                else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://news.google.com/search?q=" + Uri.encode(reporterTopic))))
-            }, modifier = Modifier.fillMaxWidth()) { Text("CARI SUMBER BERITA TERKINI (GOOGLE NEWS)") }
             StudioField("Topik / isu yang dipantau", reporterTopic, { reporterTopic = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Contoh: banjir, kebijakan publik, olahraga...")
+            Text("PENELUSURAN SUMBER PUBLIK", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+            Text("Pilih platform untuk mencari laporan terkait topik. Hasil pencarian bukan bukti kebenaran; redaksi tetap wajib membuka sumber, memeriksa tanggal, membandingkan laporan, dan mengonfirmasi fakta.", color = Color(0xFFB8C4D9), fontSize = 10.sp)
+            val encodedReporterQuery = Uri.encode(reporterTopic)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://news.google.com/search?q=$encodedReporterQuery")))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Google News") }
+                OutlinedButton(
+                    onClick = {
+                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.bing.com/news/search?q=$encodedReporterQuery")))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Bing News") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=$encodedReporterQuery")))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("YouTube") }
+                OutlinedButton(
+                    onClick = {
+                        if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                        else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com/search?q=$encodedReporterQuery")))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("TikTok") }
+            }
+            OutlinedButton(
+                onClick = {
+                    if (reporterTopic.isBlank()) Toast.makeText(context, "Isi topik berita terlebih dahulu", Toast.LENGTH_SHORT).show()
+                    else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/search/posts/?q=$encodedReporterQuery")))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Cari unggahan publik Facebook") }
             StudioField("Tautan sumber utama", reporterSourceUrl, { reporterSourceUrl = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Tempel URL berita atau unggahan publik...")
             StudioField("Fakta dan hasil konfirmasi", reporterFacts, { reporterFacts = it; reporterApproved = false; reporterMaterialAppliedToVideo = false }, "Catat siapa, apa, kapan, di mana, bukti, dan tanggapan...")
             Row(verticalAlignment = Alignment.CenterVertically) {
