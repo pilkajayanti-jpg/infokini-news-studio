@@ -75,6 +75,8 @@ fun InfoKiniStudio() {
     var photoRotation by remember { mutableFloatStateOf(0f) }
     var photoFlipHorizontal by remember { mutableStateOf(false) }
     var photoFlipVertical by remember { mutableStateOf(false) }
+    var photoCaption by remember { mutableStateOf("") }
+    var photoBrandWatermark by remember { mutableStateOf(true) }
     var videoDurationMs by remember { mutableLongStateOf(0L) }
     var videoStartMs by remember { mutableFloatStateOf(0f) }
     var videoEndMs by remember { mutableFloatStateOf(0f) }
@@ -348,7 +350,38 @@ fun InfoKiniStudio() {
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
                         colorFilter = ColorMatrixColorFilter(createPhotoColorMatrix(photoBrightness, photoContrast, photoSaturation))
                     }
-                    Canvas(edited).drawBitmap(rotated, 0f, 0f, paint)
+                    val editCanvas = Canvas(edited)
+                    editCanvas.drawBitmap(rotated, 0f, 0f, paint)
+                    if (photoCaption.isNotBlank() || photoBrandWatermark) {
+                        val overlay = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(205, 8, 13, 74) }
+                        val barHeight = (edited.height * 0.19f).coerceAtLeast(110f)
+                        editCanvas.drawRect(0f, edited.height - barHeight, edited.width.toFloat(), edited.height.toFloat(), overlay)
+                        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.WHITE
+                            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                            textSize = (edited.width * 0.045f).coerceIn(22f, 64f)
+                        }
+                        if (photoCaption.isNotBlank()) {
+                            val words = photoCaption.trim().split(Regex("\\s+"))
+                            var line = ""
+                            var y = edited.height - barHeight + labelPaint.textSize * 1.5f
+                            val maxWidth = edited.width * 0.9f
+                            for (word in words) {
+                                val candidate = if (line.isEmpty()) word else "$line $word"
+                                if (labelPaint.measureText(candidate) > maxWidth && line.isNotEmpty()) {
+                                    editCanvas.drawText(line, edited.width * 0.05f, y, labelPaint)
+                                    y += labelPaint.textSize * 1.2f
+                                    line = word
+                                } else line = candidate
+                            }
+                            if (line.isNotEmpty() && y < edited.height - 12f) editCanvas.drawText(line, edited.width * 0.05f, y, labelPaint)
+                        }
+                        if (photoBrandWatermark) {
+                            labelPaint.color = android.graphics.Color.rgb(19, 189, 235)
+                            labelPaint.textSize = (edited.width * 0.032f).coerceIn(18f, 42f)
+                            editCanvas.drawText("INFO KINI • infokini.news", edited.width * 0.05f, edited.height - edited.height * 0.035f, labelPaint)
+                        }
+                    }
                     if (rotated !== source) rotated.recycle()
                     val stream = context.contentResolver.openOutputStream(outputUri)
                         ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka")
@@ -573,6 +606,11 @@ fun InfoKiniStudio() {
                 Slider(value = photoSaturation, onValueChange = { photoSaturation = it }, valueRange = 0f..2f)
                 Text("Rotasi: ${photoRotation.toInt()}°", color = Color.White, fontSize = 12.sp)
                 Slider(value = photoRotation, onValueChange = { photoRotation = it }, valueRange = -180f..180f)
+                StudioField("Teks pada foto", photoCaption, { photoCaption = it }, "Tambahkan keterangan atau judul foto...")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = photoBrandWatermark, onCheckedChange = { photoBrandWatermark = it })
+                    Text("Tambahkan watermark InfoKini pada foto", color = Color.White, fontSize = 12.sp)
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { photoFlipHorizontal = !photoFlipHorizontal }, modifier = Modifier.weight(1f)) {
                         Text(if (photoFlipHorizontal) "Balik kiri-kanan: aktif" else "Balik kiri-kanan")
@@ -589,6 +627,8 @@ fun InfoKiniStudio() {
                         photoRotation = 0f
                         photoFlipHorizontal = false
                         photoFlipVertical = false
+                        photoCaption = ""
+                        photoBrandWatermark = true
                     }, modifier = Modifier.weight(1f)) { Text("Atur ulang") }
                     Button(onClick = { photoExporter.launch("InfoKini-Foto-Edit.jpg") }, modifier = Modifier.weight(1f)) {
                         Text("SIMPAN FOTO EDIT")
