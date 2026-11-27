@@ -54,7 +54,10 @@ internal class StudioProjectRepository(context: Context) {
     }
 
     private fun persist(items: List<StudioProject>) {
-        prefs.edit().putString("projects", encode(items).toString()).apply()
+        // Report success only after Android confirms the data reached persistent storage.
+        check(prefs.edit().putString("projects", encode(items).toString()).commit()) {
+            "Gagal menyimpan data proyek ke penyimpanan perangkat."
+        }
     }
 
     private fun encode(items: List<StudioProject>): JSONArray = JSONArray().apply {
