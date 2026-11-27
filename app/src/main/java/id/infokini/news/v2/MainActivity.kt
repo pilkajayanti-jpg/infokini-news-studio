@@ -564,19 +564,46 @@ private fun SportsScreen() {
     var homeScore by remember { mutableStateOf(prefs.getInt("home_score", 0)) }
     var awayScore by remember { mutableStateOf(prefs.getInt("away_score", 0)) }
     var period by remember { mutableStateOf(prefs.getString("period", "BABAK 1").orEmpty()) }
+    var elapsedSeconds by remember { mutableStateOf(prefs.getInt("elapsed_seconds", 0)) }
+    var timerRunning by remember { mutableStateOf(false) }
+    var homeYellow by remember { mutableStateOf(prefs.getInt("home_yellow", 0)) }
+    var awayYellow by remember { mutableStateOf(prefs.getInt("away_yellow", 0)) }
+    var homeRed by remember { mutableStateOf(prefs.getInt("home_red", 0)) }
+    var awayRed by remember { mutableStateOf(prefs.getInt("away_red", 0)) }
 
-    androidx.compose.runtime.LaunchedEffect(homeName, awayName, homeScore, awayScore, period) {
+    androidx.compose.runtime.LaunchedEffect(timerRunning) {
+        while (timerRunning) {
+            kotlinx.coroutines.delay(1000)
+            elapsedSeconds++
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(homeName, awayName, homeScore, awayScore, period, elapsedSeconds, homeYellow, awayYellow, homeRed, awayRed) {
         prefs.edit()
             .putString("home_name", homeName)
             .putString("away_name", awayName)
             .putInt("home_score", homeScore)
             .putInt("away_score", awayScore)
             .putString("period", period)
+            .putInt("elapsed_seconds", elapsedSeconds)
+            .putInt("home_yellow", homeYellow).putInt("away_yellow", awayYellow)
+            .putInt("home_red", homeRed).putInt("away_red", awayRed)
             .apply()
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("GRAFIS PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val clockText = "%02d:%02d".format(elapsedSeconds / 60, elapsedSeconds % 60)
+                Text("WAKTU PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text(clockText, color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 34.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { timerRunning = !timerRunning }) { Text(if (timerRunning) "Jeda" else "Mulai") }
+                    OutlinedButton(onClick = { timerRunning = false; elapsedSeconds = 0 }) { Text("Reset waktu") }
+                }
+            }
+        }
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(16.dp)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("INFOKINI SPORT  •  $period", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -604,12 +631,41 @@ private fun SportsScreen() {
         OutlinedTextField(value = homeName, onValueChange = { homeName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama tim kandang") }, singleLine = true)
         OutlinedTextField(value = awayName, onValueChange = { awayName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama tim tandang") }, singleLine = true)
         OutlinedTextField(value = period, onValueChange = { period = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Babak / status pertandingan") }, singleLine = true)
+        Text("KARTU PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(homeName, color = SoftWhite, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🟨 $homeYellow", color = SoftWhite)
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick = { homeYellow++ }) { Text("+") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🟥 $homeRed", color = SoftWhite)
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick = { homeRed++ }) { Text("+") }
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(awayName, color = SoftWhite, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🟨 $awayYellow", color = SoftWhite)
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick = { awayYellow++ }) { Text("+") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🟥 $awayRed", color = SoftWhite)
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick = { awayRed++ }) { Text("+") }
+                }
+            }
+        }
         OutlinedButton(onClick = {
-            homeScore = 0
-            awayScore = 0
-            period = "BABAK 1"
-        }, modifier = Modifier.fillMaxWidth()) { Text("Reset papan skor") }
-        Text("Data tim, skor, dan babak tersimpan otomatis di perangkat ini. Papan skor masih manual dan belum terhubung ke data pertandingan langsung, timer otomatis, kartu, atau overlay video.", color = Muted, fontSize = 11.sp)
+            homeScore = 0; awayScore = 0; period = "BABAK 1"
+            elapsedSeconds = 0; timerRunning = false
+            homeYellow = 0; awayYellow = 0; homeRed = 0; awayRed = 0
+        }, modifier = Modifier.fillMaxWidth()) { Text("Reset seluruh pertandingan") }
+        Text("Nama tim, skor, waktu pertandingan, babak, dan kartu tersimpan otomatis di perangkat. Timer dan kartu masih manual; grafis ini belum masuk ke encoder streaming.", color = Muted, fontSize = 11.sp)
     }
 }
 
