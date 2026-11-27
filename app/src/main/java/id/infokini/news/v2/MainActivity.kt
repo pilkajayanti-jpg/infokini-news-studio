@@ -712,32 +712,52 @@ private fun VideoStudioScreen(
                     }
                 }
             }
-            AndroidView(
-                factory = { ctx ->
-                    VideoView(ctx).apply {
-                        tag = previewUri.toString()
-                        setMediaController(MediaController(ctx).also { it.setAnchorView(this) })
-                        setOnPreparedListener { player: MediaPlayer ->
-                            player.isLooping = false
-                            start()
-                            exportStatus = "Video siap diputar. Gunakan kontrol untuk jeda atau lanjut."
+            Box(Modifier.fillMaxWidth().height(230.dp)) {
+                AndroidView(
+                    factory = { ctx ->
+                        VideoView(ctx).apply {
+                            tag = previewUri.toString()
+                            setMediaController(MediaController(ctx).also { it.setAnchorView(this) })
+                            setOnPreparedListener { player: MediaPlayer ->
+                                player.isLooping = false
+                                start()
+                                exportStatus = "Video siap diputar. Grafis template ditampilkan pada pratinjau."
+                            }
+                            setOnErrorListener { _, what, extra ->
+                                exportStatus = "Video tidak dapat diputar (kode $what/$extra). Pilih berkas video MP4 lain."
+                                true
+                            }
+                            setVideoURI(previewUri)
                         }
-                        setOnErrorListener { _, what, extra ->
-                            exportStatus = "Video tidak dapat diputar (kode $what/$extra). Coba pilih MP4 yang tersimpan di perangkat."
-                            true
+                    },
+                    update = { view ->
+                        if (view.tag != previewUri.toString()) {
+                            view.tag = previewUri.toString()
+                            view.stopPlayback()
+                            view.setVideoURI(previewUri)
                         }
-                        setVideoURI(previewUri)
-                    }
-                },
-                update = { view ->
-                    if (view.tag != previewUri.toString()) {
-                        view.tag = previewUri.toString()
-                        view.stopPlayback()
-                        view.setVideoURI(previewUri)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(220.dp)
-            )
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+                val previewAccent = when (templateStyle) {
+                    "Olahraga" -> Color(0xFF17608A)
+                    "Promosi UMKM" -> Color(0xFF8B651C)
+                    "Berita Daerah" -> Color(0xFF087D91)
+                    "Wawancara" -> Color(0xFF263D55)
+                    else -> Color(0xFFB51F2A)
+                }
+                Column(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                        .background(Color(0xE6071426)).padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text("INFOKINI.NEWS  •  $templateStyle", color = Cyan, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    Text(headline.ifBlank { "JUDUL BERITA ANDA" }, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black, maxLines = 2)
+                    val bylinePreview = listOf(reporterName, locationName).filter { it.isNotBlank() }.joinToString("  •  ")
+                    if (bylinePreview.isNotBlank()) Text(bylinePreview, color = Cyan, fontSize = 9.sp, maxLines = 1)
+                    Text(ticker.ifBlank { "INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN" }, Modifier.fillMaxWidth().background(previewAccent).padding(3.dp), color = Color.White, fontSize = 8.sp, maxLines = 1)
+                }
+            }
         } else {
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(14.dp)) {
                 Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
