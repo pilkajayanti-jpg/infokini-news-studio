@@ -788,8 +788,6 @@ private fun exportVideoWithNewsOverlay(
     logoUri: Uri?,
     templateStyle: String,
     sportsScore: String?,
-    startPositionMs: Long,
-    endPositionMs: Long,
     onStatus: (String) -> Unit
 ) {
     try {
@@ -870,7 +868,9 @@ private fun exportVideoWithNewsOverlay(
         val editedItems = sources.map { clip ->
             val clipStartMs = clip.startPositionMs.coerceAtLeast(0L)
             val clipEndMs = if (clip.endPositionMs > clipStartMs) clip.endPositionMs else C.TIME_END_OF_SOURCE
-            val clipConfiguration = MediaItem.ClippingConfiguration.Builder(clipStartMs, clipEndMs)
+            val clipConfiguration = MediaItem.ClippingConfiguration.Builder()
+                .setStartPositionMs(clipStartMs)
+                .setEndPositionMs(clipEndMs)
                 .build()
             val clipMediaItem = MediaItem.Builder()
                 .setUri(clip.uri)
