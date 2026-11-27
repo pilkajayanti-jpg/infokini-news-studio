@@ -291,8 +291,7 @@ private fun TtsScreen() {
     DisposableEffect(context) {
         val tts = TextToSpeech(context) { result ->
             if (result == TextToSpeech.SUCCESS) {
-                val languageResult = ttsLanguageSetup(engine = null)
-                status = if (languageResult) "Mesin TTS siap" else "Bahasa Indonesia belum tersedia; periksa paket suara di pengaturan Android"
+                status = "Mesin TTS siap; ketersediaan suara Indonesia akan diperiksa saat mulai membaca"
             } else {
                 status = "Mesin TTS tidak dapat diinisialisasi"
             }
@@ -329,10 +328,6 @@ private fun TtsScreen() {
     }
 }
 
-private fun ttsLanguageSetup(engine: TextToSpeech?): Boolean {
-    if (engine == null) return false
-    return engine.setLanguage(Locale("id", "ID")) >= TextToSpeech.LANG_AVAILABLE
-}
 
 @Composable
 private fun MoreScreen(onOpen: (String) -> Unit) {
