@@ -8,6 +8,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Typeface
 import androidx.media3.common.MediaItem
+import androidx.media3.common.C
 import androidx.media3.transformer.Effects
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.EditedMediaItem
@@ -867,9 +868,9 @@ private fun exportVideoWithNewsOverlay(
         val bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(overlay)
         val effects = Effects(emptyList(), listOf(OverlayEffect(listOf(bitmapOverlay))))
         val editedItems = sources.map { clip ->
-            val clipConfiguration = MediaItem.ClippingConfiguration.Builder()
-                .setStartPositionMs(clip.startPositionMs.coerceAtLeast(0L))
-                .apply { if (clip.endPositionMs > clip.startPositionMs) setEndPositionMs(clip.endPositionMs) }
+            val clipStartMs = clip.startPositionMs.coerceAtLeast(0L)
+            val clipEndMs = if (clip.endPositionMs > clipStartMs) clip.endPositionMs else C.TIME_END_OF_SOURCE
+            val clipConfiguration = MediaItem.ClippingConfiguration.Builder(clipStartMs, clipEndMs)
                 .build()
             val clipMediaItem = MediaItem.Builder()
                 .setUri(clip.uri)
