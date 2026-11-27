@@ -334,12 +334,25 @@ private fun TtsScreen() {
 
 @Composable
 private fun SportsScreen() {
-    var homeName by remember { mutableStateOf("TIM A") }
-    var awayName by remember { mutableStateOf("TIM B") }
-    var homeScore by remember { mutableStateOf(0) }
-    var awayScore by remember { mutableStateOf(0) }
-    var period by remember { mutableStateOf("BABAK 1") }
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("infokini_sports_v2", 0) }
+    var homeName by remember { mutableStateOf(prefs.getString("home_name", "TIM A").orEmpty()) }
+    var awayName by remember { mutableStateOf(prefs.getString("away_name", "TIM B").orEmpty()) }
+    var homeScore by remember { mutableStateOf(prefs.getInt("home_score", 0)) }
+    var awayScore by remember { mutableStateOf(prefs.getInt("away_score", 0)) }
+    var period by remember { mutableStateOf(prefs.getString("period", "BABAK 1").orEmpty()) }
+
+    androidx.compose.runtime.LaunchedEffect(homeName, awayName, homeScore, awayScore, period) {
+        prefs.edit()
+            .putString("home_name", homeName)
+            .putString("away_name", awayName)
+            .putInt("home_score", homeScore)
+            .putInt("away_score", awayScore)
+            .putString("period", period)
+            .apply()
+    }
+
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("GRAFIS PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(16.dp)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -368,8 +381,12 @@ private fun SportsScreen() {
         OutlinedTextField(value = homeName, onValueChange = { homeName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama tim kandang") }, singleLine = true)
         OutlinedTextField(value = awayName, onValueChange = { awayName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama tim tandang") }, singleLine = true)
         OutlinedTextField(value = period, onValueChange = { period = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Babak / status pertandingan") }, singleLine = true)
-        OutlinedButton(onClick = { homeScore = 0; awayScore = 0; period = "BABAK 1" }, modifier = Modifier.fillMaxWidth()) { Text("Reset papan skor") }
-        Text("Papan skor manual untuk grafis siaran. Belum terhubung ke data pertandingan langsung, timer otomatis, kartu, atau overlay video.", color = Muted, fontSize = 11.sp)
+        OutlinedButton(onClick = {
+            homeScore = 0
+            awayScore = 0
+            period = "BABAK 1"
+        }, modifier = Modifier.fillMaxWidth()) { Text("Reset papan skor") }
+        Text("Data tim, skor, dan babak tersimpan otomatis di perangkat ini. Papan skor masih manual dan belum terhubung ke data pertandingan langsung, timer otomatis, kartu, atau overlay video.", color = Muted, fontSize = 11.sp)
     }
 }
 
