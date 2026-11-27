@@ -47,6 +47,7 @@ private val Cyan = Color(0xFF27C5E8)
 private val Red = Color(0xFFE53945)
 private val SoftWhite = Color(0xFFEAF2FA)
 private val Muted = Color(0xFF9FB3C9)
+private val Gold = Color(0xFFFFC857)
 
 private data class StudioModule(val title: String, val subtitle: String, val status: String)
 
