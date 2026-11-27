@@ -1,5 +1,7 @@
 package id.infokini.news.v2
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,7 +40,38 @@ internal fun ProjectManagerScreen() {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Berita") }
-    var message by remember { mutableStateOf("Proyek tersimpan secara lokal di perangkat.") }
+    var search by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("Proyek tersimpan lokal. Buat cadangan agar data dapat dipindahkan.") }
+
+    val exportBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use {
+                    it.write(repository.exportJson())
+                } ?: error("Tidak dapat membuka lokasi penyimpanan.")
+                message = "Cadangan proyek berhasil diekspor."
+            } catch (error: Exception) {
+                message = "Gagal mengekspor: ${error.localizedMessage ?: "kesalahan file"}"
+            }
+        }
+    }
+    val importBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                val raw = context.contentResolver.openInputStream(uri)?.use { input ->
+                    val bytes = input.readBytes()
+                    require(bytes.size <= 1_000_000) { "File cadangan melebihi 1 MB." }
+                    bytes.toString(Charsets.UTF_8)
+                } ?: error("Tidak dapat membaca file.")
+                val count = repository.importJson(raw)
+                projects.clear()
+                projects.addAll(repository.load())
+                message = "$count proyek berhasil dipulihkan/digabungkan."
+            } catch (error: Exception) {
+                message = "Gagal mengimpor: ${error.localizedMessage ?: "format cadangan tidak valid"}"
+            }
+        }
+    }
 
     fun resetForm() {
         editingId = ""
@@ -50,21 +83,33 @@ internal fun ProjectManagerScreen() {
         if (title.isBlank()) {
             message = "Nama proyek wajib diisi."
         } else {
-            val saved = repository.save(StudioProject(editingId, title, description, category, 0L))
-            val index = projects.indexOfFirst { it.id == saved.id }
-            if (index >= 0) projects[index] = saved else projects.add(0, saved)
-            projects.sortByDescending { it.updatedAt }
-            resetForm()
-            message = "Proyek berhasil disimpan."
+            try {
+                val saved = repository.save(StudioProject(editingId, title, description, category, 0L))
+                val index = projects.indexOfFirst { it.id == saved.id }
+                if (index >= 0) projects[index] = saved else projects.add(0, saved)
+                projects.sortByDescending { it.updatedAt }
+                resetForm()
+                message = "Proyek berhasil disimpan."
+            } catch (error: Exception) {
+                message = error.localizedMessage ?: "Tidak dapat menyimpan proyek."
+            }
         }
+    }
+
+    val visibleProjects = projects.filter {
+        it.title.contains(search, true) || it.category.contains(search, true) || it.description.contains(search, true)
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("PROYEK SAYA", color = Color(0xFF27C5E8), fontWeight = FontWeight.Black, fontSize = 20.sp)
-        Text("Buat, edit, lanjutkan, dan hapus proyek produksi berita tanpa akun cloud.", color = Color(0xFF9FB3C9), fontSize = 12.sp)
+        Text("Kelola naskah dan bahan produksi. Data tersimpan di perangkat; ekspor cadangan JSON untuk memindahkannya ke HP lain.", color = Color(0xFF9FB3C9), fontSize = 12.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { exportBackup.launch("InfoKini-Proyek-Cadangan.json") }, modifier = Modifier.weight(1f)) { Text("Ekspor cadangan") }
+            OutlinedButton(onClick = { importBackup.launch(arrayOf("application/json", "text/*")) }, modifier = Modifier.weight(1f)) { Text("Pulihkan cadangan") }
+        }
         OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama proyek") }, singleLine = true)
         OutlinedTextField(value = category, onValueChange = { category = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Kategori: Berita / Olahraga / UMKM / Lainnya") }, singleLine = true)
-        OutlinedTextField(value = description, onValueChange = { description = it }, modifier = Modifier.fillMaxWidth().height(100.dp), label = { Text("Catatan dan bahan produksi") })
+        OutlinedTextField(value = description, onValueChange = { description = it }, modifier = Modifier.fillMaxWidth().height(90.dp), label = { Text("Catatan dan bahan produksi") })
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { saveProject() }, modifier = Modifier.weight(1f), enabled = title.isNotBlank()) {
                 Text(if (editingId.isBlank()) "Simpan proyek" else "Perbarui proyek")
@@ -72,19 +117,20 @@ internal fun ProjectManagerScreen() {
             OutlinedButton(onClick = { resetForm(); message = "Formulir proyek baru." }) { Text("Baru") }
         }
         Text(message, color = Color(0xFFFFC857), fontSize = 11.sp)
-        Text("DAFTAR PROYEK • ${projects.size}", color = Color(0xFF27C5E8), fontWeight = FontWeight.Bold, fontSize = 11.sp)
-        if (projects.isEmpty()) {
-            Text("Belum ada proyek. Isi nama proyek lalu tekan Simpan proyek.", color = Color(0xFF9FB3C9))
+        OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Cari nama, kategori, atau isi proyek") }, singleLine = true)
+        Text("DAFTAR PROYEK • ${visibleProjects.size} / ${projects.size}", color = Color(0xFF27C5E8), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        if (visibleProjects.isEmpty()) {
+            Text("Tidak ada proyek yang cocok. Buat proyek baru atau ubah kata pencarian.", color = Color(0xFF9FB3C9))
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(projects, key = { it.id }) { project ->
+                items(visibleProjects, key = { it.id }) { project ->
                     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF10243D))) {
                         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(project.title, color = Color.White, fontWeight = FontWeight.Bold)
                             Text(project.category, color = Color(0xFF27C5E8), fontSize = 10.sp)
                             if (project.description.isNotBlank()) Text(project.description, color = Color(0xFF9FB3C9), fontSize = 12.sp)
                             Text("Diperbarui: ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(project.updatedAt))}", color = Color(0xFF9FB3C9), fontSize = 9.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 OutlinedButton(onClick = {
                                     editingId = project.id
                                     title = project.title
@@ -92,6 +138,13 @@ internal fun ProjectManagerScreen() {
                                     category = project.category
                                     message = "Mengedit: ${project.title}"
                                 }) { Text("Edit") }
+                                OutlinedButton(onClick = {
+                                    val copy = repository.duplicate(project.id)
+                                    if (copy != null) {
+                                        projects.add(0, copy)
+                                        message = "Salinan proyek dibuat."
+                                    }
+                                }) { Text("Duplikat") }
                                 OutlinedButton(onClick = {
                                     repository.delete(project.id)
                                     projects.removeAll { it.id == project.id }
