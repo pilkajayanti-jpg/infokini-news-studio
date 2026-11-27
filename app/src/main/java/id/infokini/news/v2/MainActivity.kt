@@ -35,6 +35,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -241,17 +244,35 @@ private fun LiveScreen(
 
 @Composable
 private fun EditorialScreen() {
-    var topic by remember { mutableStateOf("") }
-    var draft by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("infokini_editorial_v2", 0) }
+    var topic by remember { mutableStateOf(prefs.getString("topic", "").orEmpty()) }
+    var draft by remember { mutableStateOf(prefs.getString("draft", "").orEmpty()) }
+    var sourceUrl by remember { mutableStateOf(prefs.getString("source_url", "").orEmpty()) }
+    var status by remember { mutableStateOf(prefs.getString("status", "DRAF — BELUM DISETUJUI").orEmpty()) }
+    val sourceValid = sourceUrl.startsWith("https://") || sourceUrl.startsWith("http://")
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("AI REDAKTUR", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
-        Text("Ruang kerja redaksi untuk riset sumber, pencatatan fakta dan penyusunan draf. Tidak ada Reporter AI.", color = Muted, fontSize = 12.sp)
-        OutlinedTextField(value = topic, onValueChange = { topic = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Topik / isu berita") })
-        OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.fillMaxWidth().weight(1f), label = { Text("Catatan fakta dan draf redaksi") })
-        Text("AI Redaktur memerlukan koneksi dan penyedia AI yang dikonfigurasi. Persetujuan redaksi wajib sebelum materi dipakai.", color = Muted, fontSize = 11.sp)
-        Button(onClick = { /* Local draft editing is available in the next persistence milestone. */ }, modifier = Modifier.fillMaxWidth()) {
-            Text("Simpan draf — segera tersedia")
-        }
+        Text("Ruang kerja redaksi. Catatan dan sumber disimpan lokal. AI belum tersambung pada build ini; jangan anggap draf sebagai berita terverifikasi.", color = Muted, fontSize = 12.sp)
+        OutlinedTextField(value = topic, onValueChange = { topic = it; status = "DRAF — BELUM DISETUJUI" }, modifier = Modifier.fillMaxWidth(), label = { Text("Topik / isu berita") })
+        OutlinedTextField(value = sourceUrl, onValueChange = { sourceUrl = it; status = "DRAF — BELUM DISETUJUI" }, modifier = Modifier.fillMaxWidth(), label = { Text("URL sumber asli (http/https)") })
+        OutlinedTextField(value = draft, onValueChange = { draft = it; status = "DRAF — BELUM DISETUJUI" }, modifier = Modifier.fillMaxWidth().height(190.dp), label = { Text("Catatan fakta dan draf redaksi") })
+        Text("Status: $status", color = if (status.startsWith("DISETUJUI")) Cyan else Gold, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Button(onClick = {
+            status = "DRAF — BELUM DISETUJUI"
+            prefs.edit().putString("topic", topic).putString("draft", draft)
+                .putString("source_url", sourceUrl).putString("status", status).apply()
+        }, modifier = Modifier.fillMaxWidth()) { Text("Simpan draf") }
+        OutlinedButton(onClick = {
+            if (topic.isNotBlank() && draft.isNotBlank() && sourceValid) {
+                status = "DISETUJUI REDAKTUR — ${System.currentTimeMillis()}"
+                prefs.edit().putString("topic", topic).putString("draft", draft)
+                    .putString("source_url", sourceUrl).putString("status", status).apply()
+            } else {
+                status = "BELUM DISETUJUI — lengkapi topik, draf, dan URL sumber"
+            }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Saya menyetujui draf ini") }
+        Text("Persetujuan hanya mencatat keputusan pengguna di perangkat. Ini bukan verifikasi fakta, bukan publikasi, dan bukan integrasi AI. Periksa sumber asli serta konfirmasi independen sebelum menayangkan berita.", color = Muted, fontSize = 11.sp)
     }
 }
 
