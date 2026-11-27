@@ -153,6 +153,8 @@ private fun InfoKiniStudioV2() {
                         "Live" -> LiveScreen(headline, { headline = it }, ticker, { ticker = it })
                         "Video" -> VideoStudioScreen(headline, { headline = it }, ticker, { ticker = it }, videoTemplate, { videoTemplate = it })
                         "Foto" -> PhotoStudioScreen()
+                        "Proyek Saya" -> ProjectManagerScreen()
+                        "Galeri Media" -> MediaLibraryScreen()
                         "Redaktur", "AI Redaktur" -> EditorialScreen()
                         "Narasi / TTS" -> TtsScreen()
                         "Grafis Olahraga", "Berita Olahraga" -> SportsScreen()
@@ -166,6 +168,8 @@ private fun InfoKiniStudioV2() {
                                 "Narasi / TTS" -> "Narasi / TTS"
                                 "Grafis Olahraga", "Berita Olahraga" -> "Grafis Olahraga"
                                 "Template Berita" -> "Template Berita"
+                                "Proyek Saya" -> "Proyek Saya"
+                                "Galeri Media" -> "Galeri Media"
                                 "Promosi UMKM" -> "Promosi UMKM"
                                 else -> module
                             }
