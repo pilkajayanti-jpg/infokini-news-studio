@@ -622,6 +622,8 @@ private fun VideoStudioScreen(
     var trimStartSeconds by remember { mutableStateOf("0") }
     var trimEndSeconds by remember { mutableStateOf("0") }
     var splitAtSeconds by remember { mutableStateOf("") }
+    var reporterName by remember { mutableStateOf("") }
+    var locationName by remember { mutableStateOf("") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { picked ->
         videoSegments = picked.map { VideoSegment(uri = it) }
         selectedClipIndex = 0
@@ -644,6 +646,7 @@ private fun VideoStudioScreen(
             } else {
                 exportVideoWithNewsOverlay(
                     context, edits, destination, headline, ticker, logoUri, templateStyle,
+                    reporterName, locationName,
                     if (showSports) "$homeName  $homeScore - $awayScore  $awayName" else null
                 ) { exportStatus = it }
             }
@@ -654,10 +657,32 @@ private fun VideoStudioScreen(
         Text("Pilih klip, susun urutannya, tentukan gaya grafis berita, lalu ekspor menjadi MP4.", color = Muted, fontSize = 12.sp)
         Button(onClick = { picker.launch("video/*") }, modifier = Modifier.fillMaxWidth()) { Text("Tambah video dari galeri") }
         Text("TEMPLATE GRAFIS VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             listOf("Breaking News", "Berita Daerah", "Olahraga", "Wawancara", "Promosi UMKM").forEach { style ->
-                if (templateStyle == style) Button(onClick = { onTemplateStyle(style) }) { Text(style, fontSize = 10.sp) }
-                else OutlinedButton(onClick = { onTemplateStyle(style) }) { Text(style, fontSize = 10.sp) }
+                val selected = templateStyle == style
+                val accent = when (style) {
+                    "Olahraga" -> Color(0xFF17608A)
+                    "Promosi UMKM" -> Color(0xFF9B7020)
+                    "Berita Daerah" -> Color(0xFF087D91)
+                    "Wawancara" -> Color(0xFF263D55)
+                    else -> Color(0xFFB51F2A)
+                }
+                Card(
+                    onClick = { onTemplateStyle(style) },
+                    modifier = Modifier.width(154.dp).height(104.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (selected) Color(0xFF214A69) else Panel),
+                    border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, Cyan) else null
+                ) {
+                    Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                        Text(style.uppercase(), color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                        Column(Modifier.fillMaxWidth().background(accent).padding(6.dp)) {
+                            Text("INFO KINI", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            Text("JUDUL BERITA ANDA", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text("infokini.news  •  RUNNING TEXT", color = Color.White, fontSize = 6.sp, maxLines = 1)
+                        }
+                        Text(if (selected) "TEMPLATE DIPILIH" else "PILIH TEMPLATE", color = if (selected) Cyan else Muted, fontSize = 8.sp)
+                    }
+                }
             }
         }
         Text("Gaya aktif: $templateStyle", color = Gold, fontSize = 10.sp)
@@ -720,8 +745,10 @@ private fun VideoStudioScreen(
                 }
             }
         }
-        OutlinedTextField(value = headline, onValueChange = onHeadline, modifier = Modifier.fillMaxWidth(), label = { Text("Judul / lower third") })
-        OutlinedTextField(value = ticker, onValueChange = onTicker, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
+        OutlinedTextField(value = headline, onValueChange = onHeadline, modifier = Modifier.fillMaxWidth(), label = { Text("Judul berita utama") })
+        OutlinedTextField(value = reporterName, onValueChange = { reporterName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama reporter / narasumber (opsional)") }, singleLine = true)
+        OutlinedTextField(value = locationName, onValueChange = { locationName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Lokasi berita (opsional)") }, singleLine = true)
+        OutlinedTextField(value = ticker, onValueChange = onTicker, modifier = Modifier.fillMaxWidth(), label = { Text("Running text / teks berjalan") })
         Text("POTONG VIDEO (DETIK)", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
@@ -833,6 +860,8 @@ private fun exportVideoWithNewsOverlay(
     ticker: String,
     logoUri: Uri?,
     templateStyle: String,
+    reporterName: String,
+    locationName: String,
     sportsScore: String?,
     onStatus: (String) -> Unit
 ) {
@@ -846,40 +875,47 @@ private fun exportVideoWithNewsOverlay(
         val dateText = "INFOKINI.NEWS  •  " + java.text.SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(java.util.Date())
         val safeHeadline = headline.ifBlank { "INFO TERKINI" }.take(62)
         val safeTicker = ticker.ifBlank { "INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN" }.take(105)
+        val byline = listOf(reporterName.trim(), locationName.trim()).filter { it.isNotBlank() }.joinToString("  •  ").take(72)
+        val bylinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(39, 197, 232); textSize = 21f; typeface = Typeface.create("sans-serif", Typeface.BOLD) }
         when (templateStyle) {
             "Berita Daerah" -> {
                 canvas.drawRect(0f, 565f, 1280f, 720f, panel)
                 canvas.drawRect(0f, 565f, 14f, 720f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(19, 189, 235) })
                 canvas.drawText(dateText, 38f, 603f, small)
-                canvas.drawText(safeHeadline, 38f, 653f, white)
+                canvas.drawText(safeHeadline, 38f, 646f, white)
+                if (byline.isNotBlank()) canvas.drawText(byline, 38f, 675f, bylinePaint)
                 canvas.drawText(safeTicker, 38f, 705f, small)
             }
             "Olahraga" -> {
                 canvas.drawRect(0f, 570f, 1280f, 720f, panel)
                 canvas.drawRect(0f, 570f, 1280f, 610f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(18, 59, 89) })
                 canvas.drawText("INFOKINI SPORT  •  $dateText", 34f, 598f, small)
-                canvas.drawText(safeHeadline, 34f, 660f, white)
+                canvas.drawText(safeHeadline, 34f, 650f, white)
+                if (byline.isNotBlank()) canvas.drawText(byline, 34f, 678f, bylinePaint)
                 canvas.drawText(safeTicker, 34f, 705f, small)
             }
             "Wawancara" -> {
                 canvas.drawRect(0f, 590f, 1280f, 720f, panel)
                 canvas.drawRect(0f, 590f, 1280f, 600f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(19, 189, 235) })
                 canvas.drawText(dateText, 38f, 630f, small)
-                canvas.drawText(safeHeadline, 38f, 675f, white)
+                canvas.drawText(safeHeadline, 38f, 660f, white)
+                if (byline.isNotBlank()) canvas.drawText(byline, 38f, 685f, bylinePaint)
                 canvas.drawText(safeTicker, 38f, 710f, small)
             }
             "Promosi UMKM" -> {
                 canvas.drawRect(0f, 570f, 1280f, 720f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(225, 28, 24, 12) })
                 canvas.drawRect(0f, 570f, 1280f, 580f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(218, 164, 55) })
                 canvas.drawText("INFO KINI  •  PROMOSI UMKM", 34f, 610f, small)
-                canvas.drawText(safeHeadline, 34f, 662f, white)
+                canvas.drawText(safeHeadline, 34f, 650f, white)
+                if (byline.isNotBlank()) canvas.drawText(byline, 34f, 678f, bylinePaint)
                 canvas.drawText(safeTicker, 34f, 705f, small)
             }
             else -> {
                 canvas.drawRect(0f, 570f, 1280f, 720f, panel)
                 canvas.drawRect(0f, 625f, 1280f, 680f, red)
                 canvas.drawText(dateText, 34f, 610f, small)
-                canvas.drawText(safeHeadline, 34f, 662f, white)
+                canvas.drawText(safeHeadline, 34f, 650f, white)
+                if (byline.isNotBlank()) canvas.drawText(byline, 34f, 678f, bylinePaint)
                 canvas.drawText(safeTicker, 34f, 705f, small)
             }
         }
