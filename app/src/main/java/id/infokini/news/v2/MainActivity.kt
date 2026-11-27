@@ -65,12 +65,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import android.view.SurfaceView
 import com.pedro.library.generic.GenericStream
 import com.pedro.encoder.input.sources.video.Camera2Source
 import com.pedro.encoder.input.sources.audio.MicrophoneSource
 import com.pedro.common.StreamingStatsReport
 import com.pedro.common.ConnectChecker
+import com.pedro.encoder.input.gl.render.filters.`object`.ImageFilterRender
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -302,6 +304,26 @@ private fun LiveScreen(
     }
     val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
     val dateLabel = java.text.SimpleDateFormat("EEEE, dd MMMM yyyy", Locale("id", "ID")).format(java.util.Date())
+    val liveOverlayFilter = remember { ImageFilterRender() }
+    var liveOverlayAttached by remember { mutableStateOf(false) }
+    LaunchedEffect(streamPrepared, headline, ticker, dateLabel, showSports, homeName, awayName, homeScore, awayScore, logoUri) {
+        if (streamPrepared) {
+            try {
+                val overlayBitmap = buildLiveOverlayBitmap(
+                    context, headline, ticker, dateLabel, showSports,
+                    homeName, awayName, homeScore, awayScore, logoUri
+                )
+                liveOverlayFilter.setImage(overlayBitmap)
+                liveOverlayFilter.setScale(1f, 1f)
+                if (!liveOverlayAttached) {
+                    stream.getGlInterface().addFilter(liveOverlayFilter)
+                    liveOverlayAttached = true
+                }
+            } catch (error: Exception) {
+                streamStatus = "Grafis encoder gagal diperbarui: ${error.message}"
+            }
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
@@ -431,6 +453,94 @@ private fun LiveScreen(
         }
         Text("Logo, tanggal, headline, running text, dan papan skor opsional tampil pada pratinjau kamera. Ini masih komposisi grafis lokal; belum dikirim ke encoder atau siaran RTMP/YouTube.", color = Muted, fontSize = 11.sp)
     }
+}
+
+private fun buildLiveOverlayBitmap(
+    context: android.content.Context,
+    headline: String,
+    ticker: String,
+    dateLabel: String,
+    showSports: Boolean,
+    homeName: String,
+    awayName: String,
+    homeScore: Int,
+    awayScore: Int,
+    logoUri: Uri?
+): Bitmap {
+    val width = 1280
+    val height = 720
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
+    val navy = android.graphics.Color.rgb(7, 20, 38)
+    val red = android.graphics.Color.rgb(181, 31, 42)
+    val white = android.graphics.Color.WHITE
+    val cyan = android.graphics.Color.rgb(39, 197, 232)
+
+    paint.color = 0xCC071426.toInt()
+    canvas.drawRect(0f, 500f, width.toFloat(), height.toFloat(), paint)
+    paint.color = red
+    canvas.drawRect(0f, 610f, width.toFloat(), 675f, paint)
+
+    var logoDrawn = false
+    if (logoUri != null) {
+        try {
+            context.contentResolver.openInputStream(logoUri)?.use { input ->
+                val logo = android.graphics.BitmapFactory.decodeStream(input)
+                if (logo != null) {
+                    val dest = android.graphics.Rect(38, 520, 150, 590)
+                    canvas.drawBitmap(logo, null, dest, paint)
+                    logoDrawn = true
+                    logo.recycle()
+                }
+            }
+        } catch (_: Exception) { }
+    }
+    if (!logoDrawn) {
+        paint.color = red
+        canvas.drawRoundRect(38f, 520f, 145f, 590f, 12f, 12f, paint)
+        paint.color = white
+        paint.textSize = 48f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("IK", 62f, 570f, paint)
+    }
+
+    paint.color = white
+    paint.textSize = 34f
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    canvas.drawText("INFOKINI NEWS", 180f, 548f, paint)
+    paint.color = cyan
+    paint.textSize = 22f
+    paint.typeface = Typeface.DEFAULT
+    canvas.drawText(dateLabel, 180f, 582f, paint)
+
+    if (headline.isNotBlank()) {
+        paint.color = red
+        canvas.drawRect(0f, 610f, width.toFloat(), 675f, paint)
+        paint.color = white
+        paint.textSize = 34f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val safeHeadline = headline.uppercase().take(68)
+        canvas.drawText(safeHeadline, 38f, 655f, paint)
+    }
+
+    if (showSports) {
+        paint.color = android.graphics.Color.rgb(18, 59, 89)
+        canvas.drawRect(760f, 515f, 1240f, 590f, paint)
+        paint.color = white
+        paint.textSize = 25f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val scoreText = "$homeName  $homeScore - $awayScore  $awayName".take(36)
+        canvas.drawText(scoreText, 780f, 560f, paint)
+    }
+
+    paint.color = red
+    canvas.drawRect(0f, 675f, width.toFloat(), 720f, paint)
+    paint.color = white
+    paint.textSize = 22f
+    paint.typeface = Typeface.DEFAULT
+    canvas.drawText(ticker.take(105), 30f, 706f, paint)
+    return bitmap
 }
 
 @Composable
