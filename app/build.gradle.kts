@@ -10,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "id.infokini.news"
-        minSdk = 23
+        minSdk = 28
         targetSdk = 35
-        versionCode = 7
-        versionName = "3.0"
+        versionCode = 10
+        versionName = "4.0.0-v2"
     }
 
     compileOptions {
@@ -37,9 +37,6 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.media3:media3-common:1.9.0")
-    implementation("androidx.media3:media3-transformer:1.9.0")
-    implementation("androidx.media3:media3-effect:1.9.0")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
