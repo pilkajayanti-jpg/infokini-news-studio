@@ -1,6 +1,21 @@
 package id.infokini.news.v2
 
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Effects
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.Transformer
+import androidx.media3.transformer.Composition
+import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.ExportException
+import androidx.media3.effect.BitmapOverlay
+import androidx.media3.effect.OverlayEffect
+import java.io.File
 import androidx.lifecycle.LifecycleOwner
 import androidx.camera.view.PreviewView
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -380,13 +395,21 @@ private fun CameraPreview(frontCamera: Boolean, modifier: Modifier = Modifier) {
     )
 }
 
+@OptIn(UnstableApi::class)
 @Composable
 private fun VideoStudioScreen() {
     val context = LocalContext.current
     var videoUri by remember { mutableStateOf<Uri?>(null) }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
+    var exportStatus by remember { mutableStateOf("Pilih video untuk mulai mengedit.") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { videoUri = it }
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
+        val source = videoUri
+        if (destination != null && source != null) {
+            exportVideoWithNewsOverlay(context, source, destination, headline, ticker) { exportStatus = it }
+        }
+    }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("VIDEO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
         Text("Pilih video dari perangkat untuk dipratinjau dan siapkan teks grafis berita.", color = Muted, fontSize = 12.sp)
@@ -424,7 +447,65 @@ private fun VideoStudioScreen() {
                 Text(ticker, color = SoftWhite, fontSize = 11.sp)
             }
         }
-        Text("Yang sudah berfungsi: memilih video, memutar pratinjau, dan mengisi teks grafis. Pemotongan timeline, penggabungan klip, audio mixing, dan ekspor MP4 belum tersedia.", color = Muted, fontSize = 11.sp)
+        Button(
+            onClick = { if (videoUri != null) exportPicker.launch("InfoKini-Berita.mp4") else exportStatus = "Pilih video terlebih dahulu." },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = videoUri != null
+        ) { Text("Ekspor MP4 dengan grafis berita") }
+        Text(exportStatus, color = Cyan, fontSize = 11.sp)
+        Text("Ekspor ini membakar identitas kanal, tanggal, headline, dan running text ke video. Fitur potong timeline, multi-klip, serta logo khusus dari galeri masih tahap berikutnya.", color = Muted, fontSize = 11.sp)
+    }
+}
+
+@OptIn(UnstableApi::class)
+private fun exportVideoWithNewsOverlay(
+    context: android.content.Context,
+    source: Uri,
+    destination: Uri,
+    headline: String,
+    ticker: String,
+    onStatus: (String) -> Unit
+) {
+    try {
+        val overlay = Bitmap.createBitmap(1280, 720, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(overlay)
+        val panel = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(220, 7, 20, 38) }
+        val red = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(190, 35, 48) }
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = 30f; typeface = Typeface.create("sans-serif", Typeface.BOLD) }
+        val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.LTGRAY; textSize = 20f }
+        canvas.drawRect(0f, 570f, 1280f, 720f, panel)
+        canvas.drawRect(0f, 625f, 1280f, 680f, red)
+        canvas.drawText("INFOKINI NEWS  •  " + java.text.SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(java.util.Date()), 34f, 610f, small)
+        val safeHeadline = headline.ifBlank { "INFO TERKINI" }.take(62)
+        canvas.drawText(safeHeadline, 34f, 662f, white)
+        canvas.drawText(ticker.ifBlank { "INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN" }.take(105), 34f, 705f, small)
+        val bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(overlay)
+        val effects = Effects(emptyList(), listOf(OverlayEffect(listOf(bitmapOverlay))))
+        val editedItem = EditedMediaItem.Builder(MediaItem.fromUri(source)).setEffects(effects).build()
+        val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
+        val transformer = Transformer.Builder(context)
+            .addListener(object : Transformer.Listener {
+                override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                    try {
+                        context.contentResolver.openOutputStream(destination, "w")?.use { output ->
+                            outputFile.inputStream().use { input -> input.copyTo(output) }
+                        } ?: throw IllegalStateException("Tidak dapat membuka lokasi penyimpanan.")
+                        outputFile.delete()
+                        onStatus("Ekspor selesai. Video MP4 dengan grafis InfoKini sudah disimpan.")
+                    } catch (error: Exception) {
+                        onStatus("Video selesai diproses, tetapi gagal disimpan: ${error.message}")
+                    }
+                }
+                override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
+                    outputFile.delete()
+                    onStatus("Ekspor gagal: ${exportException.message}")
+                }
+            })
+            .build()
+        onStatus("Sedang merender video dan menempelkan grafis InfoKini…")
+        transformer.start(editedItem, outputFile.absolutePath)
+    } catch (error: Exception) {
+        onStatus("Tidak dapat memulai ekspor: ${error.message}")
     }
 }
 
