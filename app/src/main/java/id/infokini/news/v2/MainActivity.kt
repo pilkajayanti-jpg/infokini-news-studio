@@ -3,6 +3,7 @@ package id.infokini.news.v2
 import android.os.Bundle
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.widget.MediaController
