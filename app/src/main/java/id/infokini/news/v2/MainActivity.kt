@@ -622,31 +622,125 @@ private fun exportVideoWithNewsOverlay(
 
 @Composable
 private fun PhotoStudioScreen() {
+    val context = LocalContext.current
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { imageUri = it }
+    var logoUri by remember { mutableStateOf<Uri?>(null) }
     var caption by remember { mutableStateOf("INFO KINI") }
+    var subheading by remember { mutableStateOf("BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
+    var format by remember { mutableStateOf("4:5") }
+    var status by remember { mutableStateOf("Pilih foto untuk membuat poster berita.") }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { imageUri = it }
+    val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { destination ->
+        val source = imageUri
+        if (source != null && destination != null) exportNewsPoster(context, source, destination, caption, subheading, logoUri, format) { status = it }
+    }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("PHOTO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
-        Text("Pilih foto untuk pratinjau dan siapkan teks poster berita.", color = Muted, fontSize = 12.sp)
-        Button(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text("Pilih foto dari HP") }
+        Text("Buat poster berita InfoKini dari foto galeri dengan judul, subjudul, logo, dan format media sosial.", color = Muted, fontSize = 12.sp)
+        Button(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(if (imageUri == null) "Pilih foto dari HP" else "Ganti foto") }
         if (imageUri != null) {
             AndroidView(
                 factory = { ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER; setImageURI(imageUri) } },
                 update = { it.setImageURI(imageUri) },
-                modifier = Modifier.fillMaxWidth().height(260.dp)
+                modifier = Modifier.fillMaxWidth().height(230.dp)
             )
         } else {
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(14.dp)) {
-                Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) { Text("PRATINJAU FOTO", color = Muted) }
+                Box(Modifier.fillMaxWidth().height(190.dp), contentAlignment = Alignment.Center) { Text("PRATINJAU FOTO", color = Muted) }
             }
         }
-        OutlinedTextField(value = caption, onValueChange = { caption = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul poster / watermark") })
-        Text("INFO KINI", color = Cyan, fontWeight = FontWeight.Black)
-        Text(caption, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text("Yang sudah berfungsi: memilih dan melihat foto serta menyiapkan teks poster. Crop, filter, penghapus latar, layer desain, dan ekspor gambar belum tersedia.", color = Muted, fontSize = 11.sp)
+        Text("FORMAT POSTER", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("4:5", "1:1", "16:9").forEach { item ->
+                if (format == item) Button(onClick = { format = item }, modifier = Modifier.weight(1f)) { Text(item) }
+                else OutlinedButton(onClick = { format = item }, modifier = Modifier.weight(1f)) { Text(item) }
+            }
+        }
+        OutlinedTextField(value = caption, onValueChange = { caption = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul utama poster") })
+        OutlinedTextField(value = subheading, onValueChange = { subheading = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Subjudul / keterangan") })
+        OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(if (logoUri == null) "Tambahkan logo kanal (opsional)" else "Ganti logo kanal") }
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("CONTOH IDENTITAS POSTER", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("INFOKINI.NEWS", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                Text(caption.ifBlank { "Judul berita akan tampil di sini" }, color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp)
+                Text(subheading, color = Muted, fontSize = 11.sp)
+                Text("Format $format • tanggal otomatis saat ekspor", color = Gold, fontSize = 10.sp)
+            }
+        }
+        Button(onClick = { if (imageUri != null) exportPicker.launch("InfoKini-Poster.png") else status = "Pilih foto terlebih dahulu." }, modifier = Modifier.fillMaxWidth(), enabled = imageUri != null) { Text("Ekspor poster PNG") }
+        Text(status, color = Cyan, fontSize = 11.sp)
+        Text("Ekspor menghasilkan PNG dengan pemotongan otomatis sesuai rasio, judul, subjudul, tanggal, identitas InfoKini, dan logo opsional. Filter, layer bebas, dan penghapus latar belum tersedia.", color = Muted, fontSize = 11.sp)
     }
 }
 
+private fun exportNewsPoster(
+    context: android.content.Context, source: Uri, destination: Uri,
+    headline: String, subheading: String, logoUri: Uri?, format: String, onStatus: (String) -> Unit
+) {
+    var sourceBitmap: Bitmap? = null
+    var outputBitmap: Bitmap? = null
+    try {
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(source)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+            ?: throw IllegalStateException("Foto sumber tidak dapat dibuka.")
+        var sample = 1
+        while (bounds.outWidth / sample > 1800 || bounds.outHeight / sample > 1800) sample *= 2
+        val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample; inPreferredConfig = Bitmap.Config.ARGB_8888 }
+        sourceBitmap = context.contentResolver.openInputStream(source)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+            ?: throw IllegalStateException("Gagal membaca foto.")
+        val ratio = when (format) { "1:1" -> 1f; "16:9" -> 16f / 9f; else -> 4f / 5f }
+        val width = 1080
+        val height = (width / ratio).toInt()
+        outputBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(outputBitmap)
+        val src = sourceBitmap
+        val scale = maxOf(width.toFloat() / src.width, height.toFloat() / src.height)
+        val scaledWidth = src.width * scale
+        val scaledHeight = src.height * scale
+        val left = (width - scaledWidth) / 2f
+        val top = (height - scaledHeight) / 2f
+        canvas.drawBitmap(src, null, android.graphics.RectF(left, top, left + scaledWidth, top + scaledHeight), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        val shade = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(210, 7, 20, 38) }
+        val red = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(190, 35, 48) }
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = width * 0.052f; typeface = Typeface.create("sans-serif", Typeface.BOLD) }
+        val muted = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.LTGRAY; textSize = width * 0.026f }
+        val panelTop = height * 0.67f
+        canvas.drawRect(0f, panelTop, width.toFloat(), height.toFloat(), shade)
+        canvas.drawRect(0f, panelTop, width.toFloat(), panelTop + height * 0.012f, red)
+        canvas.drawText("INFOKINI.NEWS", width * 0.055f, panelTop + height * 0.075f, muted)
+        val date = java.text.SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID")).format(java.util.Date())
+        canvas.drawText(date, width * 0.055f, panelTop + height * 0.112f, muted)
+        val lines = headline.ifBlank { "INFO TERKINI" }.take(90).chunked(30).take(3)
+        var baseline = panelTop + height * 0.19f
+        lines.forEach { line -> canvas.drawText(line, width * 0.055f, baseline, white); baseline += height * 0.065f }
+        canvas.drawText(subheading.ifBlank { "BERPIKIR TAJAM, MENGUNGKAP KEBENARAN" }.take(72), width * 0.055f, height * 0.94f, muted)
+        if (logoUri != null) {
+            try {
+                context.contentResolver.openInputStream(logoUri)?.use { stream ->
+                    val logo = android.graphics.BitmapFactory.decodeStream(stream)
+                    if (logo != null) {
+                        val maxW = width * 0.20f; val maxH = height * 0.10f
+                        val logoScale = minOf(maxW / logo.width, maxH / logo.height)
+                        val w = logo.width * logoScale; val h = logo.height * logoScale
+                        canvas.drawBitmap(logo, null, android.graphics.RectF(width - w - width * 0.05f, height * 0.05f, width - width * 0.05f, height * 0.05f + h), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                        logo.recycle()
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+        context.contentResolver.openOutputStream(destination, "w")?.use { output ->
+            if (!outputBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) throw IllegalStateException("Gagal menyimpan PNG.")
+        } ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka.")
+        onStatus("Poster berhasil diekspor sebagai PNG.")
+    } catch (error: Exception) {
+        onStatus("Ekspor poster gagal: ${error.message}")
+    } finally {
+        sourceBitmap?.recycle()
+        outputBitmap?.recycle()
+    }
+}
 @Composable
 private fun ModuleWorkspaceScreen(module: String) {
     val context = LocalContext.current
