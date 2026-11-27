@@ -402,12 +402,19 @@ private fun VideoStudioScreen() {
     var videoUri by remember { mutableStateOf<Uri?>(null) }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
+    var logoUri by remember { mutableStateOf<Uri?>(null) }
+    var showSports by remember { mutableStateOf(false) }
+    var homeName by remember { mutableStateOf("TIM A") }
+    var awayName by remember { mutableStateOf("TIM B") }
+    var homeScore by remember { mutableStateOf(0) }
+    var awayScore by remember { mutableStateOf(0) }
     var exportStatus by remember { mutableStateOf("Pilih video untuk mulai mengedit.") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { videoUri = it }
+    val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
         val source = videoUri
         if (destination != null && source != null) {
-            exportVideoWithNewsOverlay(context, source, destination, headline, ticker) { exportStatus = it }
+            exportVideoWithNewsOverlay(context, source, destination, headline, ticker, logoUri, if (showSports) "$homeName  $homeScore - $awayScore  $awayName" else null) { exportStatus = it }
         }
     }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -440,6 +447,26 @@ private fun VideoStudioScreen() {
         }
         OutlinedTextField(value = headline, onValueChange = { headline = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul / lower third") })
         OutlinedTextField(value = ticker, onValueChange = { ticker = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
+        OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (logoUri == null) "Pilih logo kanal dari HP" else "Ganti logo kanal")
+        }
+        OutlinedButton(onClick = { showSports = !showSports }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (showSports) "Sembunyikan grafis olahraga" else "Tambahkan grafis olahraga")
+        }
+        if (showSports) {
+            OutlinedTextField(value = homeName, onValueChange = { homeName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Tim kandang") }, singleLine = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { if (homeScore > 0) homeScore-- }) { Text("−") }
+                Text("$homeScore", color = SoftWhite, fontWeight = FontWeight.Bold)
+                Button(onClick = { homeScore++ }) { Text("+ Gol") }
+            }
+            OutlinedTextField(value = awayName, onValueChange = { awayName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Tim tandang") }, singleLine = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { if (awayScore > 0) awayScore-- }) { Text("−") }
+                Text("$awayScore", color = SoftWhite, fontWeight = FontWeight.Bold)
+                Button(onClick = { awayScore++ }) { Text("+ Gol") }
+            }
+        }
         Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Grafis yang disiapkan", color = Cyan, fontWeight = FontWeight.Bold)
@@ -453,7 +480,7 @@ private fun VideoStudioScreen() {
             enabled = videoUri != null
         ) { Text("Ekspor MP4 dengan grafis berita") }
         Text(exportStatus, color = Cyan, fontSize = 11.sp)
-        Text("Ekspor ini membakar identitas kanal, tanggal, headline, dan running text ke video. Fitur potong timeline, multi-klip, serta logo khusus dari galeri masih tahap berikutnya.", color = Muted, fontSize = 11.sp)
+        Text("Ekspor membakar identitas kanal, tanggal, headline, running text, logo pilihan, dan papan skor opsional ke video. Timeline potong/gabung klip masih tahap berikutnya.", color = Muted, fontSize = 11.sp)
     }
 }
 
@@ -464,6 +491,8 @@ private fun exportVideoWithNewsOverlay(
     destination: Uri,
     headline: String,
     ticker: String,
+    logoUri: Uri?,
+    sportsScore: String?,
     onStatus: (String) -> Unit
 ) {
     try {
@@ -479,6 +508,32 @@ private fun exportVideoWithNewsOverlay(
         val safeHeadline = headline.ifBlank { "INFO TERKINI" }.take(62)
         canvas.drawText(safeHeadline, 34f, 662f, white)
         canvas.drawText(ticker.ifBlank { "INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN" }.take(105), 34f, 705f, small)
+        if (!sportsScore.isNullOrBlank()) {
+            val sportPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                textSize = 27f
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            }
+            canvas.drawRoundRect(760f, 500f, 1250f, 555f, 12f, 12f, panel)
+            canvas.drawText(sportsScore.take(34), 780f, 537f, sportPaint)
+        }
+        if (logoUri != null) {
+            try {
+                context.contentResolver.openInputStream(logoUri)?.use { stream ->
+                    val logo = android.graphics.BitmapFactory.decodeStream(stream)
+                    if (logo != null) {
+                        val maxW = 150f
+                        val maxH = 85f
+                        val scale = minOf(maxW / logo.width, maxH / logo.height)
+                        val w = logo.width * scale
+                        val h = logo.height * scale
+                        val dst = android.graphics.RectF(1080f - w, 475f - h, 1080f, 475f)
+                        canvas.drawBitmap(logo, null, dst, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                        logo.recycle()
+                    }
+                }
+            } catch (_: Exception) { }
+        }
         val bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(overlay)
         val effects = Effects(emptyList(), listOf(OverlayEffect(listOf(bitmapOverlay))))
         val editedItem = EditedMediaItem.Builder(MediaItem.fromUri(source)).setEffects(effects).build()
