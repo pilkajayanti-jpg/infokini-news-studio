@@ -685,8 +685,8 @@ private fun VideoStudioScreen(
                 }
             }
         }
-        OutlinedTextField(value = headline, onValueChange = { headline = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul / lower third") })
-        OutlinedTextField(value = ticker, onValueChange = { ticker = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
+        OutlinedTextField(value = headline, onValueChange = onHeadline, modifier = Modifier.fillMaxWidth(), label = { Text("Judul / lower third") })
+        OutlinedTextField(value = ticker, onValueChange = onTicker, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
         Text("POTONG VIDEO (DETIK)", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
