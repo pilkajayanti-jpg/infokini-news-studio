@@ -37,6 +37,9 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    // Media3 is used by the existing video editor for playback/export.
+    implementation("androidx.media3:media3-common:1.5.1")
+    implementation("androidx.media3:media3-transformer:1.5.1")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
