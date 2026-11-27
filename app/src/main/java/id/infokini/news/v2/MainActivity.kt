@@ -314,7 +314,7 @@ private fun LiveScreen(
                     homeName, awayName, homeScore, awayScore, logoUri
                 )
                 liveOverlayFilter.setImage(overlayBitmap)
-                liveOverlayFilter.setScale(1f, 1f)
+                liveOverlayFilter.setScale(100f, 100f)
                 if (!liveOverlayAttached) {
                     stream.getGlInterface().addFilter(liveOverlayFilter)
                     liveOverlayAttached = true
