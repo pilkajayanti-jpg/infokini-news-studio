@@ -1,4 +1,5 @@
 name: Build InfoKini News Studio V2 APK
+# Build and test every update on studio-v2.
 
 on:
   workflow_dispatch:
