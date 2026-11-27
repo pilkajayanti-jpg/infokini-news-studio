@@ -636,7 +636,7 @@ private fun VideoStudioScreen(
         picked.forEach { uri ->
             try { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
         }
-        videoSegments = picked.map { VideoSegment(uri = it) }
+        videoSegments = picked.map { uri -> VideoSegment(uri = uri, durationMs = readVideoDurationMs(context, uri)) }
         selectedClipIndex = 0
         trimStartSeconds = "0"
         trimEndSeconds = "0"
@@ -655,9 +655,15 @@ private fun VideoStudioScreen(
                 val end = (segment.endSeconds.toLongOrNull() ?: 0L).coerceAtLeast(0L)
                 VideoClipEdit(segment.uri, start * 1000L, end * 1000L)
             }
-            val invalid = edits.any { it.endPositionMs > 0L && it.endPositionMs <= it.startPositionMs }
-            if (invalid) {
-                exportStatus = "Ada klip dengan waktu potong tidak valid. Waktu akhir harus lebih besar dari waktu awal."
+            val invalidIndex = sources.indexOfFirst { segment ->
+                val start = segment.startSeconds.toLongOrNull() ?: 0L
+                val end = segment.endSeconds.toLongOrNull() ?: 0L
+                start < 0L || (end > 0L && end <= start) ||
+                    (segment.durationMs > 0L && (start * 1000L >= segment.durationMs || (end > 0L && end * 1000L > segment.durationMs)))
+            }
+            if (invalidIndex >= 0) {
+                val bad = sources[invalidIndex]
+                exportStatus = "Rentang klip ${invalidIndex + 1} melewati durasi video atau waktu akhirnya tidak valid. Durasi: ${formatVideoDuration(bad.durationMs)}."
             } else {
                 exportVideoWithNewsOverlay(
                     context, edits, destination, headline, ticker, logoUri, templateStyle,
@@ -733,7 +739,10 @@ private fun VideoStudioScreen(
             videoSegments.forEachIndexed { index, segment ->
                 Card(colors = CardDefaults.cardColors(containerColor = if (selectedClipIndex == index) Color(0xFF173B5C) else Panel), shape = RoundedCornerShape(10.dp)) {
                     Row(Modifier.fillMaxWidth().padding(7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text("KLIP ${index + 1}", color = if (selectedClipIndex == index) Cyan else SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Column(Modifier.weight(1f)) {
+                            Text("KLIP ${index + 1}", color = if (selectedClipIndex == index) Cyan else SoftWhite, fontWeight = FontWeight.Bold)
+                            Text("Durasi: ${formatVideoDuration(segment.durationMs)}  •  ${segment.startSeconds}s–${if (segment.endSeconds == "0") "akhir" else segment.endSeconds + "s"}", color = Muted, fontSize = 9.sp)
+                        }
                         OutlinedButton(onClick = {
                             selectedClipIndex = index
                             trimStartSeconds = segment.startSeconds
@@ -911,8 +920,27 @@ private data class VideoSegment(
     val id: String = java.util.UUID.randomUUID().toString(),
     val uri: Uri,
     val startSeconds: String = "0",
-    val endSeconds: String = "0"
+    val endSeconds: String = "0",
+    val durationMs: Long = 0L
 )
+
+private fun readVideoDurationMs(context: android.content.Context, uri: Uri): Long {
+    val retriever = android.media.MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(context, uri)
+        retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+    } catch (_: Exception) {
+        0L
+    } finally {
+        try { retriever.release() } catch (_: Exception) { }
+    }
+}
+
+private fun formatVideoDuration(durationMs: Long): String {
+    if (durationMs <= 0L) return "tidak diketahui"
+    val totalSeconds = durationMs / 1000L
+    return "%d:%02d".format(totalSeconds / 60L, totalSeconds % 60L)
+}
 
 private data class VideoClipEdit(
     val uri: Uri,
