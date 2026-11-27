@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Typeface
 import androidx.media3.common.MediaItem
 import androidx.media3.transformer.Effects
@@ -620,12 +622,13 @@ private fun PhotoStudioScreen() {
     var caption by remember { mutableStateOf("INFO KINI") }
     var subheading by remember { mutableStateOf("BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
     var format by remember { mutableStateOf("4:5") }
+    var photoFilter by remember { mutableStateOf("Asli") }
     var status by remember { mutableStateOf("Pilih foto untuk membuat poster berita.") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { imageUri = it }
     val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { destination ->
         val source = imageUri
-        if (source != null && destination != null) exportNewsPoster(context, source, destination, caption, subheading, logoUri, format) { status = it }
+        if (source != null && destination != null) exportNewsPoster(context, source, destination, caption, subheading, logoUri, format, photoFilter) { status = it }
     }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("PHOTO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
@@ -649,6 +652,16 @@ private fun PhotoStudioScreen() {
                 else OutlinedButton(onClick = { format = item }, modifier = Modifier.weight(1f)) { Text(item) }
             }
         }
+        Text("FILTER FOTO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("Asli", "Hitam Putih", "Sepia", "Vivid").forEach { item ->
+                if (photoFilter == item) Button(onClick = { photoFilter = item }, modifier = Modifier.weight(1f)) {
+                    Text(item, fontSize = 9.sp)
+                } else OutlinedButton(onClick = { photoFilter = item }, modifier = Modifier.weight(1f)) {
+                    Text(item, fontSize = 9.sp)
+                }
+            }
+        }
         OutlinedTextField(value = caption, onValueChange = { caption = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul utama poster") })
         OutlinedTextField(value = subheading, onValueChange = { subheading = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Subjudul / keterangan") })
         OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(if (logoUri == null) "Tambahkan logo kanal (opsional)" else "Ganti logo kanal") }
@@ -663,13 +676,13 @@ private fun PhotoStudioScreen() {
         }
         Button(onClick = { if (imageUri != null) exportPicker.launch("InfoKini-Poster.png") else status = "Pilih foto terlebih dahulu." }, modifier = Modifier.fillMaxWidth(), enabled = imageUri != null) { Text("Ekspor poster PNG") }
         Text(status, color = Cyan, fontSize = 11.sp)
-        Text("Ekspor menghasilkan PNG dengan pemotongan otomatis sesuai rasio, judul, subjudul, tanggal, identitas InfoKini, dan logo opsional. Filter, layer bebas, dan penghapus latar belum tersedia.", color = Muted, fontSize = 11.sp)
+        Text("Ekspor menghasilkan PNG dengan pemotongan otomatis sesuai rasio, judul, subjudul, tanggal, identitas InfoKini, logo opsional, dan filter warna dasar. Layer bebas serta penghapus latar belum tersedia.", color = Muted, fontSize = 11.sp)
     }
 }
 
 private fun exportNewsPoster(
     context: android.content.Context, source: Uri, destination: Uri,
-    headline: String, subheading: String, logoUri: Uri?, format: String, onStatus: (String) -> Unit
+    headline: String, subheading: String, logoUri: Uri?, format: String, photoFilter: String, onStatus: (String) -> Unit
 ) {
     var sourceBitmap: Bitmap? = null
     var outputBitmap: Bitmap? = null
@@ -694,7 +707,19 @@ private fun exportNewsPoster(
         val scaledHeight = src.height * scale
         val left = (width - scaledWidth) / 2f
         val top = (height - scaledHeight) / 2f
-        canvas.drawBitmap(src, null, android.graphics.RectF(left, top, left + scaledWidth, top + scaledHeight), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        val photoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        photoPaint.colorFilter = when (photoFilter) {
+            "Hitam Putih" -> ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+            "Sepia" -> ColorMatrixColorFilter(ColorMatrix(floatArrayOf(
+                0.393f, 0.769f, 0.189f, 0f, 0f,
+                0.349f, 0.686f, 0.168f, 0f, 0f,
+                0.272f, 0.534f, 0.131f, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f
+            )))
+            "Vivid" -> ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(1.35f) })
+            else -> null
+        }
+        canvas.drawBitmap(src, null, android.graphics.RectF(left, top, left + scaledWidth, top + scaledHeight), photoPaint)
         val shade = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(210, 7, 20, 38) }
         val red = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(190, 35, 48) }
         val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = width * 0.052f; typeface = Typeface.create("sans-serif", Typeface.BOLD) }
