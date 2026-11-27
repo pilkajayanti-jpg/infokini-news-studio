@@ -619,20 +619,31 @@ private fun VideoStudioScreen(
     var exportStatus by remember { mutableStateOf("Pilih video untuk mulai mengedit.") }
     var trimStartSeconds by remember { mutableStateOf("0") }
     var trimEndSeconds by remember { mutableStateOf("0") }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { picked -> videoUris = picked; selectedClipIndex = 0 }
+    var clipTrims by remember { mutableStateOf<Map<String, Pair<String, String>>>(emptyMap()) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { picked ->
+        videoUris = picked
+        selectedClipIndex = 0
+        val first = picked.firstOrNull()?.let { clipTrims[it.toString()] }
+        trimStartSeconds = first?.first ?: "0"
+        trimEndSeconds = first?.second ?: "0"
+    }
     val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
         val sources = videoUris
         if (destination != null && sources.isNotEmpty()) {
-            val startSeconds = trimStartSeconds.toLongOrNull() ?: 0L
-            val endSeconds = trimEndSeconds.toLongOrNull() ?: 0L
-            if (startSeconds < 0L || endSeconds < 0L || (endSeconds > 0L && endSeconds <= startSeconds)) {
-                exportStatus = "Rentang potong tidak valid. Waktu akhir harus lebih besar dari waktu awal."
+            val edits = sources.map { uri ->
+                val trim = clipTrims[uri.toString()] ?: ("0" to "0")
+                val start = (trim.first.toLongOrNull() ?: 0L).coerceAtLeast(0L)
+                val end = (trim.second.toLongOrNull() ?: 0L).coerceAtLeast(0L)
+                VideoClipEdit(uri, start * 1000L, end * 1000L)
+            }
+            val invalid = edits.any { it.endPositionMs > 0L && it.endPositionMs <= it.startPositionMs }
+            if (invalid) {
+                exportStatus = "Ada klip dengan waktu potong tidak valid. Waktu akhir harus lebih besar dari waktu awal."
             } else {
                 exportVideoWithNewsOverlay(
-                    context, sources, destination, headline, ticker, logoUri, templateStyle,
-                    if (showSports) "$homeName  $homeScore - $awayScore  $awayName" else null,
-                    startSeconds * 1000L, endSeconds * 1000L
+                    context, edits, destination, headline, ticker, logoUri, templateStyle,
+                    if (showSports) "$homeName  $homeScore - $awayScore  $awayName" else null
                 ) { exportStatus = it }
             }
         }
@@ -655,10 +666,22 @@ private fun VideoStudioScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = if (selectedClipIndex == index) Color(0xFF173B5C) else Panel), shape = RoundedCornerShape(10.dp)) {
                     Row(Modifier.fillMaxWidth().padding(7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text("KLIP ${index + 1}", color = if (selectedClipIndex == index) Cyan else SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        OutlinedButton(onClick = { selectedClipIndex = index }) { Text("Pratinjau") }
+                        OutlinedButton(onClick = {
+                            selectedClipIndex = index
+                            val trim = clipTrims[uri.toString()] ?: ("0" to "0")
+                            trimStartSeconds = trim.first
+                            trimEndSeconds = trim.second
+                        }) { Text("Pratinjau") }
                         OutlinedButton(onClick = { if (index > 0) { val list = videoUris.toMutableList(); val item = list.removeAt(index); list.add(index - 1, item); videoUris = list; selectedClipIndex = index - 1 } }, enabled = index > 0) { Text("↑") }
                         OutlinedButton(onClick = { if (index < videoUris.lastIndex) { val list = videoUris.toMutableList(); val item = list.removeAt(index); list.add(index + 1, item); videoUris = list; selectedClipIndex = index + 1 } }, enabled = index < videoUris.lastIndex) { Text("↓") }
-                        OutlinedButton(onClick = { videoUris = videoUris.toMutableList().also { it.removeAt(index) }; selectedClipIndex = (selectedClipIndex.coerceAtMost((videoUris.size - 1).coerceAtLeast(0))) }) { Text("Hapus") }
+                        OutlinedButton(onClick = {
+                            val updated = videoUris.toMutableList().also { it.removeAt(index) }
+                            videoUris = updated
+                            selectedClipIndex = selectedClipIndex.coerceAtMost((updated.size - 1).coerceAtLeast(0))
+                            val next = updated.getOrNull(selectedClipIndex)?.let { clipTrims[it.toString()] }
+                            trimStartSeconds = next?.first ?: "0"
+                            trimEndSeconds = next?.second ?: "0"
+                        }) { Text("Hapus") }
                     }
                 }
             }
@@ -691,20 +714,26 @@ private fun VideoStudioScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = trimStartSeconds,
-                onValueChange = { trimStartSeconds = it.filter(Char::isDigit) },
+                onValueChange = {
+                    trimStartSeconds = it.filter(Char::isDigit)
+                    previewUri?.let { uri -> clipTrims = clipTrims + (uri.toString() to (trimStartSeconds to trimEndSeconds)) }
+                },
                 modifier = Modifier.weight(1f),
                 label = { Text("Mulai dari detik") },
                 singleLine = true
             )
             OutlinedTextField(
                 value = trimEndSeconds,
-                onValueChange = { trimEndSeconds = it.filter(Char::isDigit) },
+                onValueChange = {
+                    trimEndSeconds = it.filter(Char::isDigit)
+                    previewUri?.let { uri -> clipTrims = clipTrims + (uri.toString() to (trimStartSeconds to trimEndSeconds)) }
+                },
                 modifier = Modifier.weight(1f),
                 label = { Text("Sampai detik (0 = akhir)") },
                 singleLine = true
             )
         }
-        Text("Contoh: mulai 10, sampai 45 akan mengekspor bagian detik 10–45. Isi 0 pada waktu akhir untuk memakai akhir video.", color = Muted, fontSize = 10.sp)
+        Text("Atur waktu potong untuk klip yang sedang dipilih. Setiap klip dapat memiliki rentang berbeda; isi 0 pada waktu akhir untuk memakai akhir klip.", color = Muted, fontSize = 10.sp)
         OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
             Text(if (logoUri == null) "Pilih logo kanal dari HP" else "Ganti logo kanal")
         }
@@ -738,14 +767,20 @@ private fun VideoStudioScreen(
             enabled = videoUris.isNotEmpty()
         ) { Text("Ekspor MP4 dengan grafis berita") }
         Text(exportStatus, color = Cyan, fontSize = 11.sp)
-        Text("Ekspor menggabungkan klip sesuai urutan pilihan, menerapkan rentang potong yang sama pada tiap klip, lalu membakar grafis InfoKini, logo, dan skor opsional. Uji pada perangkat tetap diperlukan.", color = Muted, fontSize = 11.sp)
+        Text("Ekspor menggabungkan klip sesuai urutan pilihan, memakai rentang potong masing-masing klip, lalu membakar grafis InfoKini, logo, dan skor opsional. Uji pada perangkat tetap diperlukan.", color = Muted, fontSize = 11.sp)
     }
 }
+
+private data class VideoClipEdit(
+    val uri: Uri,
+    val startPositionMs: Long,
+    val endPositionMs: Long
+)
 
 @OptIn(UnstableApi::class)
 private fun exportVideoWithNewsOverlay(
     context: android.content.Context,
-    sources: List<Uri>,
+    sources: List<VideoClipEdit>,
     destination: Uri,
     headline: String,
     ticker: String,
@@ -831,13 +866,13 @@ private fun exportVideoWithNewsOverlay(
         }
         val bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(overlay)
         val effects = Effects(emptyList(), listOf(OverlayEffect(listOf(bitmapOverlay))))
-        val editedItems = sources.map { clipUri ->
+        val editedItems = sources.map { clip ->
             val clipConfiguration = MediaItem.ClippingConfiguration.Builder()
-                .setStartPositionMs(startPositionMs.coerceAtLeast(0L))
-                .apply { if (endPositionMs > startPositionMs) setEndPositionMs(endPositionMs) }
+                .setStartPositionMs(clip.startPositionMs.coerceAtLeast(0L))
+                .apply { if (clip.endPositionMs > clip.startPositionMs) setEndPositionMs(clip.endPositionMs) }
                 .build()
             val clipMediaItem = MediaItem.Builder()
-                .setUri(clipUri)
+                .setUri(clip.uri)
                 .setClippingConfiguration(clipConfiguration)
                 .build()
             EditedMediaItem.Builder(clipMediaItem).setEffects(effects).build()
