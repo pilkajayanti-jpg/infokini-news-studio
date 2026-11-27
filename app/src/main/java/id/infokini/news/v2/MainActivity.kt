@@ -6,7 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Effects
+import androidx.media3.transformer.Effects
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Transformer
