@@ -62,6 +62,7 @@ private val modules = listOf(
     StudioModule("Template Berita", "Paket grafis khas InfoKini", "Tahap fondasi"),
     StudioModule("Narasi / TTS", "Naskah menjadi suara Bahasa Indonesia", "Tahap fondasi"),
     StudioModule("Grafis Olahraga", "Papan skor dan grafis pertandingan", "Tahap fondasi"),
+    StudioModule("Berita Olahraga", "Ruang draf dan catatan liputan olahraga", "Tahap fondasi"),
     StudioModule("Promosi UMKM", "Poster dan video promosi produk lokal", "Tahap fondasi"),
     StudioModule("Proyek Saya", "Simpan dan lanjutkan pekerjaan", "Tahap fondasi"),
     StudioModule("Galeri Media", "Kelola foto, video dan audio", "Tahap fondasi"),
@@ -106,6 +107,8 @@ private fun InfoKiniStudioV2() {
                         "Video" -> SimpleScreen("Video Studio", "Ruang kerja editor video InfoKini. Impor klip, susun timeline, tambahkan grafis dan siapkan ekspor MP4.")
                         "Foto" -> SimpleScreen("Photo Studio", "Ruang desain poster, thumbnail, foto berita, logo dan watermark.")
                         "Redaktur" -> EditorialScreen()
+                        "Narasi / TTS" -> TtsScreen()
+                        "Grafis Olahraga", "Berita Olahraga" -> SportsScreen()
                         "Narasi / TTS" -> TtsScreen()
                         else -> MoreScreen(onOpen = { selected = it })
                     }
@@ -328,6 +331,47 @@ private fun TtsScreen() {
     }
 }
 
+
+@Composable
+private fun SportsScreen() {
+    var homeName by remember { mutableStateOf("TIM A") }
+    var awayName by remember { mutableStateOf("TIM B") }
+    var homeScore by remember { mutableStateOf(0) }
+    var awayScore by remember { mutableStateOf(0) }
+    var period by remember { mutableStateOf("BABAK 1") }
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("GRAFIS PERTANDINGAN", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(16.dp)) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("INFOKINI SPORT  •  $period", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(homeName.uppercase(), color = SoftWhite, fontWeight = FontWeight.Bold)
+                        Text(homeScore.toString(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 44.sp)
+                        Row {
+                            OutlinedButton(onClick = { if (homeScore > 0) homeScore-- }) { Text("−") }
+                            Button(onClick = { homeScore++ }) { Text("+ Gol") }
+                        }
+                    }
+                    Text("VS", color = Cyan, fontWeight = FontWeight.Black)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(awayName.uppercase(), color = SoftWhite, fontWeight = FontWeight.Bold)
+                        Text(awayScore.toString(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 44.sp)
+                        Row {
+                            OutlinedButton(onClick = { if (awayScore > 0) awayScore-- }) { Text("−") }
+                            Button(onClick = { awayScore++ }) { Text("+ Gol") }
+                        }
+                    }
+                }
+            }
+        }
+        OutlinedTextField(value = homeName, onValueChange = { homeName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama tim kandang") }, singleLine = true)
+        OutlinedTextField(value = awayName, onValueChange = { awayName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama tim tandang") }, singleLine = true)
+        OutlinedTextField(value = period, onValueChange = { period = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Babak / status pertandingan") }, singleLine = true)
+        OutlinedButton(onClick = { homeScore = 0; awayScore = 0; period = "BABAK 1" }, modifier = Modifier.fillMaxWidth()) { Text("Reset papan skor") }
+        Text("Papan skor manual untuk grafis siaran. Belum terhubung ke data pertandingan langsung, timer otomatis, kartu, atau overlay video.", color = Muted, fontSize = 11.sp)
+    }
+}
 
 @Composable
 private fun MoreScreen(onOpen: (String) -> Unit) {
