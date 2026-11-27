@@ -9,6 +9,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.transformer.Effects
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.ExportResult
@@ -399,7 +400,8 @@ private fun CameraPreview(frontCamera: Boolean, modifier: Modifier = Modifier) {
 @Composable
 private fun VideoStudioScreen() {
     val context = LocalContext.current
-    var videoUri by remember { mutableStateOf<Uri?>(null) }
+    var videoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    val previewUri = videoUris.firstOrNull()
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
     var logoUri by remember { mutableStateOf<Uri?>(null) }
@@ -411,18 +413,18 @@ private fun VideoStudioScreen() {
     var exportStatus by remember { mutableStateOf("Pilih video untuk mulai mengedit.") }
     var trimStartSeconds by remember { mutableStateOf("0") }
     var trimEndSeconds by remember { mutableStateOf("0") }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { videoUri = it }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { videoUris = it }
     val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
-        val source = videoUri
-        if (destination != null && source != null) {
+        val sources = videoUris
+        if (destination != null && sources.isNotEmpty()) {
             val startSeconds = trimStartSeconds.toLongOrNull() ?: 0L
             val endSeconds = trimEndSeconds.toLongOrNull() ?: 0L
             if (startSeconds < 0L || endSeconds < 0L || (endSeconds > 0L && endSeconds <= startSeconds)) {
                 exportStatus = "Rentang potong tidak valid. Waktu akhir harus lebih besar dari waktu awal."
             } else {
                 exportVideoWithNewsOverlay(
-                    context, source, destination, headline, ticker, logoUri,
+                    context, sources, destination, headline, ticker, logoUri,
                     if (showSports) "$homeName  $homeScore - $awayScore  $awayName" else null,
                     startSeconds * 1000L, endSeconds * 1000L
                 ) { exportStatus = it }
@@ -432,19 +434,20 @@ private fun VideoStudioScreen() {
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("VIDEO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
         Text("Pilih video dari perangkat untuk dipratinjau dan siapkan teks grafis berita.", color = Muted, fontSize = 12.sp)
-        Button(onClick = { picker.launch("video/*") }, modifier = Modifier.fillMaxWidth()) { Text("Pilih video dari HP") }
-        if (videoUri != null) {
+        Button(onClick = { picker.launch("video/*") }, modifier = Modifier.fillMaxWidth()) { Text("Pilih satu atau beberapa video") }
+        if (videoUris.isNotEmpty()) {
+            Text("${videoUris.size} klip dipilih — urutan mengikuti pilihan dari galeri.", color = Cyan, fontSize = 11.sp)
             AndroidView(
                 factory = { ctx ->
                     VideoView(ctx).apply {
-                        setVideoURI(videoUri)
+                        setVideoURI(previewUri)
                         setMediaController(MediaController(ctx).also { it.setAnchorView(this) })
                     }
                 },
                 update = { view ->
-                    if (view.tag != videoUri.toString()) {
-                        view.tag = videoUri.toString()
-                        view.setVideoURI(videoUri)
+                    if (view.tag != previewUri.toString()) {
+                        view.tag = previewUri.toString()
+                        view.setVideoURI(previewUri)
                         view.setMediaController(MediaController(context).also { it.setAnchorView(view) })
                     }
                 },
@@ -505,19 +508,19 @@ private fun VideoStudioScreen() {
             }
         }
         Button(
-            onClick = { if (videoUri != null) exportPicker.launch("InfoKini-Berita.mp4") else exportStatus = "Pilih video terlebih dahulu." },
+            onClick = { if (videoUris.isNotEmpty()) exportPicker.launch("InfoKini-Berita.mp4") else exportStatus = "Pilih video terlebih dahulu." },
             modifier = Modifier.fillMaxWidth(),
-            enabled = videoUri != null
+            enabled = videoUris.isNotEmpty()
         ) { Text("Ekspor MP4 dengan grafis berita") }
         Text(exportStatus, color = Cyan, fontSize = 11.sp)
-        Text("Ekspor membakar identitas kanal, tanggal, headline, running text, logo pilihan, dan papan skor opsional ke video. Timeline potong/gabung klip masih tahap berikutnya.", color = Muted, fontSize = 11.sp)
+        Text("Ekspor menggabungkan klip sesuai urutan pilihan, menerapkan rentang potong yang sama pada tiap klip, lalu membakar grafis InfoKini, logo, dan skor opsional. Uji pada perangkat tetap diperlukan.", color = Muted, fontSize = 11.sp)
     }
 }
 
 @OptIn(UnstableApi::class)
 private fun exportVideoWithNewsOverlay(
     context: android.content.Context,
-    source: Uri,
+    sources: List<Uri>,
     destination: Uri,
     headline: String,
     ticker: String,
@@ -576,7 +579,20 @@ private fun exportVideoWithNewsOverlay(
             .setUri(source)
             .setClippingConfiguration(clipping)
             .build()
-        val editedItem = EditedMediaItem.Builder(clippedMediaItem).setEffects(effects).build()
+        val editedItems = sources.map { clipUri ->
+            val clipConfiguration = MediaItem.ClippingConfiguration.Builder()
+                .setStartPositionMs(startPositionMs.coerceAtLeast(0L))
+                .apply { if (endPositionMs > startPositionMs) setEndPositionMs(endPositionMs) }
+                .build()
+            val clipMediaItem = MediaItem.Builder()
+                .setUri(clipUri)
+                .setClippingConfiguration(clipConfiguration)
+                .build()
+            EditedMediaItem.Builder(clipMediaItem).setEffects(effects).build()
+        }
+        if (editedItems.isEmpty()) throw IllegalArgumentException("Pilih minimal satu klip video.")
+        val sequence = EditedMediaItemSequence.withAudioAndVideoFrom(editedItems)
+        val composition = Composition.Builder(listOf(sequence)).build()
         val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
         val transformer = Transformer.Builder(context)
             .addListener(object : Transformer.Listener {
@@ -598,7 +614,7 @@ private fun exportVideoWithNewsOverlay(
             })
             .build()
         onStatus("Sedang merender video dan menempelkan grafis InfoKini…")
-        transformer.start(editedItem, outputFile.absolutePath)
+        transformer.start(composition, outputFile.absolutePath)
     } catch (error: Exception) {
         onStatus("Tidak dapat memulai ekspor: ${error.message}")
     }
