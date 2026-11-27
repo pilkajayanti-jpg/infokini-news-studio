@@ -153,7 +153,17 @@ private fun InfoKiniStudioV2() {
                         "Redaktur", "AI Redaktur" -> EditorialScreen()
                         "Narasi / TTS" -> TtsScreen()
                         "Grafis Olahraga", "Berita Olahraga" -> SportsScreen()
-                        "Lainnya" -> MoreScreen(onOpen = { selected = it })
+                        "Lainnya" -> MoreScreen(onOpen = { module ->
+                            selected = when (module) {
+                                "Live Studio" -> "Live"
+                                "Video Studio" -> "Video"
+                                "Photo Studio" -> "Foto"
+                                "AI Redaktur" -> "Redaktur"
+                                "Narasi / TTS" -> "Narasi / TTS"
+                                "Grafis Olahraga", "Berita Olahraga" -> "Grafis Olahraga"
+                                else -> module
+                            }
+                        })
                         else -> ModuleWorkspaceScreen(selected)
                     }
                 }
