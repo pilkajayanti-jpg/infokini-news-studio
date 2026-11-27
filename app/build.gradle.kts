@@ -40,6 +40,9 @@ dependencies {
     // Media3 is used by the existing video editor for playback/export.
     implementation("androidx.media3:media3-common:1.5.1")
     implementation("androidx.media3:media3-transformer:1.5.1")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
