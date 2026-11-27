@@ -33,6 +33,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
+import android.media.MediaPlayer
 import android.widget.MediaController
 import android.widget.VideoView
 import android.widget.ImageView
@@ -689,15 +690,25 @@ private fun VideoStudioScreen(
             AndroidView(
                 factory = { ctx ->
                     VideoView(ctx).apply {
-                        setVideoURI(previewUri)
+                        tag = previewUri.toString()
                         setMediaController(MediaController(ctx).also { it.setAnchorView(this) })
+                        setOnPreparedListener { player: MediaPlayer ->
+                            player.isLooping = false
+                            start()
+                            exportStatus = "Video siap diputar. Gunakan kontrol untuk jeda atau lanjut."
+                        }
+                        setOnErrorListener { _, what, extra ->
+                            exportStatus = "Video tidak dapat diputar (kode $what/$extra). Coba pilih MP4 yang tersimpan di perangkat."
+                            true
+                        }
+                        setVideoURI(previewUri)
                     }
                 },
                 update = { view ->
                     if (view.tag != previewUri.toString()) {
                         view.tag = previewUri.toString()
+                        view.stopPlayback()
                         view.setVideoURI(previewUri)
-                        view.setMediaController(MediaController(context).also { it.setAnchorView(view) })
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(220.dp)
