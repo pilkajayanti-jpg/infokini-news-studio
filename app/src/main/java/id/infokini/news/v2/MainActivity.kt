@@ -65,6 +65,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import android.view.SurfaceView
+import com.pedro.library.generic.GenericStream
+import com.pedro.encoder.input.sources.video.Camera2Source
+import com.pedro.encoder.input.sources.audio.MicrophoneSource
+import com.pedro.common.StreamingStatsReport
+import com.pedro.common.ConnectChecker
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -260,10 +267,27 @@ private fun LiveScreen(
     onTicker: (String) -> Unit
 ) {
     val context = LocalContext.current
-    var cameraGranted by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-    }
+    var cameraGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
+    var audioGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
     var frontCamera by remember { mutableStateOf(false) }
+    var streamStatus by remember { mutableStateOf("Siapkan kamera dan mikrofon untuk siaran.") }
+    var streamPrepared by remember { mutableStateOf(false) }
+    var isStreaming by remember { mutableStateOf(false) }
+    val stream = remember {
+        GenericStream(context.applicationContext, object : ConnectChecker {
+            override fun onConnectionStarted(url: String) { streamStatus = "Menghubungkan ke server RTMP…" }
+            override fun onConnectionSuccess() { isStreaming = true; streamStatus = "Terhubung — siaran sedang berlangsung." }
+            override fun onConnectionFailed(reason: String) { isStreaming = false; streamStatus = "Koneksi gagal: $reason" }
+            override fun onDisconnect() { isStreaming = false; streamStatus = "Siaran terputus." }
+            override fun onAuthError() { isStreaming = false; streamStatus = "Autentikasi ditolak. Periksa stream key." }
+            override fun onAuthSuccess() { streamStatus = "Autentikasi server berhasil." }
+            override fun onStreamingStats(report: StreamingStatsReport) { }
+        })
+    }
+    val audioPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { audioGranted = it }
+    DisposableEffect(stream) {
+        onDispose { try { if (stream.isStreaming) stream.stopStream(); if (stream.isOnPreview) stream.stopPreview(); stream.release() } catch (_: Exception) { } }
+    }
     var logoUri by remember { mutableStateOf<Uri?>(null) }
     var showSports by remember { mutableStateOf(false) }
     var homeName by remember { mutableStateOf("TIM A") }
@@ -287,7 +311,21 @@ private fun LiveScreen(
         Text("KAMERA DAN GRAFIS SIARAN", color = Muted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
         if (cameraGranted) {
             Box(Modifier.fillMaxWidth().height(235.dp)) {
-                CameraPreview(frontCamera = frontCamera, modifier = Modifier.fillMaxSize())
+                AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
+                    SurfaceView(ctx).also { surface ->
+                        if (!streamPrepared) {
+                            try {
+                                stream.changeVideoSource(Camera2Source(context.applicationContext))
+                                stream.changeAudioSource(MicrophoneSource())
+                                streamPrepared = stream.prepareVideo(1280, 720, 1_800_000) && stream.prepareAudio(32000, true, 128000)
+                                if (streamPrepared) {
+                                    stream.startPreview(surface)
+                                    streamStatus = "Pratinjau encoder siap. Isi server untuk mulai siaran."
+                                } else streamStatus = "Perangkat tidak mendukung konfigurasi encoder ini."
+                            } catch (error: Exception) { streamStatus = "Gagal menyiapkan encoder: ${error.message}" }
+                        } else if (!stream.isOnPreview) stream.startPreview(surface)
+                    }
+                })
                 Column(
                     Modifier.align(Alignment.BottomStart).fillMaxWidth()
                         .background(Color(0xCC071426)).padding(9.dp),
@@ -322,9 +360,10 @@ private fun LiveScreen(
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { frontCamera = !frontCamera }, modifier = Modifier.weight(1f)) {
-                    Text(if (frontCamera) "Kamera belakang" else "Kamera depan")
-                }
+                OutlinedButton(onClick = {
+                    try { (stream.videoSource as? Camera2Source)?.switchCamera(); frontCamera = !frontCamera }
+                    catch (error: Exception) { streamStatus = "Gagal mengganti kamera: ${error.message}" }
+                }, modifier = Modifier.weight(1f)) { Text(if (frontCamera) "Kamera belakang" else "Kamera depan") }
                 OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.weight(1f)) {
                     Text(if (logoUri == null) "Pilih logo" else "Ganti logo")
                 }
@@ -338,6 +377,24 @@ private fun LiveScreen(
                 }
             }
         }
+        if (!audioGranted) OutlinedButton(onClick = { audioPermission.launch(Manifest.permission.RECORD_AUDIO) }, modifier = Modifier.fillMaxWidth()) { Text("Izinkan mikrofon untuk siaran") }
+        Button(onClick = {
+            val validAddress = rtmpAddress.startsWith("rtmp://") || rtmpAddress.startsWith("rtmps://")
+            when {
+                !cameraGranted -> streamStatus = "Izin kamera belum diberikan."
+                !audioGranted -> streamStatus = "Izin mikrofon belum diberikan."
+                !streamPrepared -> streamStatus = "Encoder belum siap. Periksa kamera dan perangkat."
+                !validAddress || rtmpStreamKey.isBlank() -> streamStatus = "Isi alamat server RTMP/RTMPS dan stream key."
+                isStreaming -> { stream.stopStream(); isStreaming = false; streamStatus = "Menghentikan siaran…"; }
+                else -> {
+                    val fullUrl = rtmpAddress.trim().trimEnd('/') + "/" + rtmpStreamKey.trim().trimStart('/')
+                    streamStatus = "Memulai siaran…"
+                    stream.startStream(fullUrl)
+                }
+            }
+        }, modifier = Modifier.fillMaxWidth(), enabled = streamPrepared && cameraGranted && audioGranted) { Text(if (isStreaming) "HENTIKAN SIARAN" else "MULAI SIARAN RTMP") }
+        Text(streamStatus, color = if (isStreaming) Cyan else Gold, fontSize = 11.sp)
+        Text("Encoder mengirim kamera dan mikrofon. Grafis headline/logo/ticker/skor belum dirender ke frame siaran; masih tahap integrasi berikutnya.", color = Muted, fontSize = 10.sp)
         Text("KONFIGURASI SERVER LIVE (RTMP)", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         OutlinedTextField(value = rtmpAddress, onValueChange = { rtmpAddress = it.trim(); rtmpCheck = "Konfigurasi berubah — periksa kembali." }, modifier = Modifier.fillMaxWidth(), label = { Text("Alamat server RTMP / RTMPS") }, singleLine = true)
         OutlinedTextField(value = rtmpStreamKey, onValueChange = { rtmpStreamKey = it; rtmpCheck = "Konfigurasi berubah — periksa kembali." }, modifier = Modifier.fillMaxWidth(), label = { Text("Stream key (rahasia)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
