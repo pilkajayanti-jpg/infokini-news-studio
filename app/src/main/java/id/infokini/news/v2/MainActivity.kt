@@ -608,9 +608,9 @@ private fun VideoStudioScreen(
     onTemplateStyle: (String) -> Unit
 ) {
     val context = LocalContext.current
-    var videoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var videoSegments by remember { mutableStateOf<List<VideoSegment>>(emptyList()) }
     var selectedClipIndex by remember { mutableStateOf(0) }
-    val previewUri = videoUris.getOrNull(selectedClipIndex) ?: videoUris.firstOrNull()
+    val previewUri = videoSegments.getOrNull(selectedClipIndex)?.uri
     var logoUri by remember { mutableStateOf<Uri?>(null) }
     var showSports by remember { mutableStateOf(false) }
     var homeName by remember { mutableStateOf("TIM A") }
@@ -620,23 +620,22 @@ private fun VideoStudioScreen(
     var exportStatus by remember { mutableStateOf("Pilih video untuk mulai mengedit.") }
     var trimStartSeconds by remember { mutableStateOf("0") }
     var trimEndSeconds by remember { mutableStateOf("0") }
-    var clipTrims by remember { mutableStateOf<Map<String, Pair<String, String>>>(emptyMap()) }
+    var splitAtSeconds by remember { mutableStateOf("") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { picked ->
-        videoUris = picked
+        videoSegments = picked.map { VideoSegment(uri = it) }
         selectedClipIndex = 0
-        val first = picked.firstOrNull()?.let { clipTrims[it.toString()] }
-        trimStartSeconds = first?.first ?: "0"
-        trimEndSeconds = first?.second ?: "0"
+        trimStartSeconds = "0"
+        trimEndSeconds = "0"
+        splitAtSeconds = ""
     }
     val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
-        val sources = videoUris
+        val sources = videoSegments
         if (destination != null && sources.isNotEmpty()) {
-            val edits = sources.map { uri ->
-                val trim = clipTrims[uri.toString()] ?: ("0" to "0")
-                val start = (trim.first.toLongOrNull() ?: 0L).coerceAtLeast(0L)
-                val end = (trim.second.toLongOrNull() ?: 0L).coerceAtLeast(0L)
-                VideoClipEdit(uri, start * 1000L, end * 1000L)
+            val edits = sources.map { segment ->
+                val start = (segment.startSeconds.toLongOrNull() ?: 0L).coerceAtLeast(0L)
+                val end = (segment.endSeconds.toLongOrNull() ?: 0L).coerceAtLeast(0L)
+                VideoClipEdit(segment.uri, start * 1000L, end * 1000L)
             }
             val invalid = edits.any { it.endPositionMs > 0L && it.endPositionMs <= it.startPositionMs }
             if (invalid) {
@@ -661,27 +660,28 @@ private fun VideoStudioScreen(
             }
         }
         Text("Gaya aktif: $templateStyle", color = Gold, fontSize = 10.sp)
-        if (videoUris.isNotEmpty()) {
-            Text("${videoUris.size} klip dalam daftar edit. Pilih klip untuk pratinjau dan atur urutan sebelum ekspor.", color = Cyan, fontSize = 11.sp)
-            videoUris.forEachIndexed { index, uri ->
+        if (videoSegments.isNotEmpty()) {
+            Text("${videoSegments.size} segmen dalam daftar edit. Setiap segmen dapat dipotong dan diatur urutannya secara mandiri.", color = Cyan, fontSize = 11.sp)
+            videoSegments.forEachIndexed { index, segment ->
                 Card(colors = CardDefaults.cardColors(containerColor = if (selectedClipIndex == index) Color(0xFF173B5C) else Panel), shape = RoundedCornerShape(10.dp)) {
                     Row(Modifier.fillMaxWidth().padding(7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text("KLIP ${index + 1}", color = if (selectedClipIndex == index) Cyan else SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         OutlinedButton(onClick = {
                             selectedClipIndex = index
-                            val trim = clipTrims[uri.toString()] ?: ("0" to "0")
-                            trimStartSeconds = trim.first
-                            trimEndSeconds = trim.second
+                            trimStartSeconds = segment.startSeconds
+                            trimEndSeconds = segment.endSeconds
+                            splitAtSeconds = ""
                         }) { Text("Pratinjau") }
-                        OutlinedButton(onClick = { if (index > 0) { val list = videoUris.toMutableList(); val item = list.removeAt(index); list.add(index - 1, item); videoUris = list; selectedClipIndex = index - 1 } }, enabled = index > 0) { Text("↑") }
-                        OutlinedButton(onClick = { if (index < videoUris.lastIndex) { val list = videoUris.toMutableList(); val item = list.removeAt(index); list.add(index + 1, item); videoUris = list; selectedClipIndex = index + 1 } }, enabled = index < videoUris.lastIndex) { Text("↓") }
+                        OutlinedButton(onClick = { if (index > 0) { val list = videoSegments.toMutableList(); val item = list.removeAt(index); list.add(index - 1, item); videoSegments = list; selectedClipIndex = index - 1 } }, enabled = index > 0) { Text("↑") }
+                        OutlinedButton(onClick = { if (index < videoSegments.lastIndex) { val list = videoSegments.toMutableList(); val item = list.removeAt(index); list.add(index + 1, item); videoSegments = list; selectedClipIndex = index + 1 } }, enabled = index < videoSegments.lastIndex) { Text("↓") }
                         OutlinedButton(onClick = {
-                            val updated = videoUris.toMutableList().also { it.removeAt(index) }
-                            videoUris = updated
+                            val updated = videoSegments.toMutableList().also { it.removeAt(index) }
+                            videoSegments = updated
                             selectedClipIndex = selectedClipIndex.coerceAtMost((updated.size - 1).coerceAtLeast(0))
-                            val next = updated.getOrNull(selectedClipIndex)?.let { clipTrims[it.toString()] }
-                            trimStartSeconds = next?.first ?: "0"
-                            trimEndSeconds = next?.second ?: "0"
+                            val next = updated.getOrNull(selectedClipIndex)
+                            trimStartSeconds = next?.startSeconds ?: "0"
+                            trimEndSeconds = next?.endSeconds ?: "0"
+                            splitAtSeconds = ""
                         }) { Text("Hapus") }
                     }
                 }
@@ -717,7 +717,8 @@ private fun VideoStudioScreen(
                 value = trimStartSeconds,
                 onValueChange = {
                     trimStartSeconds = it.filter(Char::isDigit)
-                    previewUri?.let { uri -> clipTrims = clipTrims + (uri.toString() to (trimStartSeconds to trimEndSeconds)) }
+                    val current = videoSegments.getOrNull(selectedClipIndex)
+                    if (current != null) videoSegments = videoSegments.toMutableList().also { it[selectedClipIndex] = current.copy(startSeconds = trimStartSeconds) }
                 },
                 modifier = Modifier.weight(1f),
                 label = { Text("Mulai dari detik") },
@@ -727,14 +728,41 @@ private fun VideoStudioScreen(
                 value = trimEndSeconds,
                 onValueChange = {
                     trimEndSeconds = it.filter(Char::isDigit)
-                    previewUri?.let { uri -> clipTrims = clipTrims + (uri.toString() to (trimStartSeconds to trimEndSeconds)) }
+                    val current = videoSegments.getOrNull(selectedClipIndex)
+                    if (current != null) videoSegments = videoSegments.toMutableList().also { it[selectedClipIndex] = current.copy(endSeconds = trimEndSeconds) }
                 },
                 modifier = Modifier.weight(1f),
                 label = { Text("Sampai detik (0 = akhir)") },
                 singleLine = true
             )
         }
-        Text("Atur waktu potong untuk klip yang sedang dipilih. Setiap klip dapat memiliki rentang berbeda; isi 0 pada waktu akhir untuk memakai akhir klip.", color = Muted, fontSize = 10.sp)
+        Text("Atur rentang waktu segmen terpilih. Waktu akhir 0 berarti sampai akhir video. Untuk memisahkan segmen, isi waktu akhir terlebih dahulu.", color = Muted, fontSize = 10.sp)
+        OutlinedTextField(value = splitAtSeconds, onValueChange = { splitAtSeconds = it.filter(Char::isDigit) }, modifier = Modifier.fillMaxWidth(), label = { Text("Pisahkan pada detik") }, singleLine = true)
+        OutlinedButton(
+            onClick = {
+                val current = videoSegments.getOrNull(selectedClipIndex)
+                val start = current?.startSeconds?.toLongOrNull() ?: 0L
+                val end = current?.endSeconds?.toLongOrNull() ?: 0L
+                val split = splitAtSeconds.toLongOrNull()
+                if (current == null) {
+                    exportStatus = "Pilih segmen yang akan dipisah."
+                } else if (end <= 0L) {
+                    exportStatus = "Isi waktu akhir segmen terlebih dahulu agar titik pisah dapat dihitung."
+                } else if (split == null || split <= start || split >= end) {
+                    exportStatus = "Titik pisah harus berada di antara waktu mulai dan waktu akhir."
+                } else {
+                    val first = current.copy(endSeconds = split.toString())
+                    val second = VideoSegment(uri = current.uri, startSeconds = split.toString(), endSeconds = end.toString())
+                    videoSegments = videoSegments.toMutableList().also { it[selectedClipIndex] = first; it.add(selectedClipIndex + 1, second) }
+                    trimStartSeconds = first.startSeconds
+                    trimEndSeconds = first.endSeconds
+                    splitAtSeconds = ""
+                    exportStatus = "Segmen berhasil dipisah menjadi dua bagian independen."
+                }
+            },
+            enabled = videoSegments.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Pisahkan klip pada titik tersebut") }
         OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
             Text(if (logoUri == null) "Pilih logo kanal dari HP" else "Ganti logo kanal")
         }
@@ -763,14 +791,21 @@ private fun VideoStudioScreen(
             }
         }
         Button(
-            onClick = { if (videoUris.isNotEmpty()) exportPicker.launch("InfoKini-Berita.mp4") else exportStatus = "Pilih video terlebih dahulu." },
+            onClick = { if (videoSegments.isNotEmpty()) exportPicker.launch("InfoKini-Berita.mp4") else exportStatus = "Pilih video terlebih dahulu." },
             modifier = Modifier.fillMaxWidth(),
-            enabled = videoUris.isNotEmpty()
+            enabled = videoSegments.isNotEmpty()
         ) { Text("Ekspor MP4 dengan grafis berita") }
         Text(exportStatus, color = Cyan, fontSize = 11.sp)
         Text("Ekspor menggabungkan klip sesuai urutan pilihan, memakai rentang potong masing-masing klip, lalu membakar grafis InfoKini, logo, dan skor opsional. Uji pada perangkat tetap diperlukan.", color = Muted, fontSize = 11.sp)
     }
 }
+
+private data class VideoSegment(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val uri: Uri,
+    val startSeconds: String = "0",
+    val endSeconds: String = "0"
+)
 
 private data class VideoClipEdit(
     val uri: Uri,
