@@ -73,6 +73,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.dp
@@ -269,6 +270,9 @@ private fun LiveScreen(
     var awayName by remember { mutableStateOf("TIM B") }
     var homeScore by remember { mutableStateOf(0) }
     var awayScore by remember { mutableStateOf(0) }
+    var rtmpAddress by remember { mutableStateOf("") }
+    var rtmpStreamKey by remember { mutableStateOf("") }
+    var rtmpCheck by remember { mutableStateOf("Belum diperiksa. Kunci siaran hanya disimpan sementara di layar ini.") }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
     }
@@ -334,6 +338,19 @@ private fun LiveScreen(
                 }
             }
         }
+        Text("KONFIGURASI SERVER LIVE (RTMP)", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        OutlinedTextField(value = rtmpAddress, onValueChange = { rtmpAddress = it.trim(); rtmpCheck = "Konfigurasi berubah — periksa kembali." }, modifier = Modifier.fillMaxWidth(), label = { Text("Alamat server RTMP / RTMPS") }, singleLine = true)
+        OutlinedTextField(value = rtmpStreamKey, onValueChange = { rtmpStreamKey = it; rtmpCheck = "Konfigurasi berubah — periksa kembali." }, modifier = Modifier.fillMaxWidth(), label = { Text("Stream key (rahasia)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+        Button(onClick = {
+            val validAddress = rtmpAddress.startsWith("rtmp://") || rtmpAddress.startsWith("rtmps://")
+            rtmpCheck = when {
+                !validAddress -> "Alamat harus diawali rtmp:// atau rtmps://."
+                rtmpStreamKey.isBlank() -> "Stream key belum diisi."
+                else -> "Format konfigurasi terisi. Belum terhubung atau mengirim siaran; encoder RTMP masih tahap integrasi."
+            }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Periksa konfigurasi RTMP") }
+        Text(rtmpCheck, color = Gold, fontSize = 10.sp)
+        Text("Jangan bagikan stream key. Kolom ini hanya sementara di memori layar; jangan gunakan perangkat bersama. Tombol ini tidak memulai siaran.", color = Muted, fontSize = 10.sp)
         OutlinedTextField(value = headline, onValueChange = onHeadline, modifier = Modifier.fillMaxWidth(), label = { Text("Judul berita / headline TV") })
         OutlinedTextField(value = ticker, onValueChange = onTicker, modifier = Modifier.fillMaxWidth(), label = { Text("Running text / berita berjalan") })
         OutlinedButton(onClick = { showSports = !showSports }, modifier = Modifier.fillMaxWidth()) {
