@@ -571,14 +571,6 @@ private fun exportVideoWithNewsOverlay(
         }
         val bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(overlay)
         val effects = Effects(emptyList(), listOf(OverlayEffect(listOf(bitmapOverlay))))
-        val clipping = MediaItem.ClippingConfiguration.Builder()
-            .setStartPositionMs(startPositionMs.coerceAtLeast(0L))
-            .apply { if (endPositionMs > startPositionMs) setEndPositionMs(endPositionMs) }
-            .build()
-        val clippedMediaItem = MediaItem.Builder()
-            .setUri(source)
-            .setClippingConfiguration(clipping)
-            .build()
         val editedItems = sources.map { clipUri ->
             val clipConfiguration = MediaItem.ClippingConfiguration.Builder()
                 .setStartPositionMs(startPositionMs.coerceAtLeast(0L))
@@ -591,7 +583,7 @@ private fun exportVideoWithNewsOverlay(
             EditedMediaItem.Builder(clipMediaItem).setEffects(effects).build()
         }
         if (editedItems.isEmpty()) throw IllegalArgumentException("Pilih minimal satu klip video.")
-        val sequence = EditedMediaItemSequence.withAudioAndVideoFrom(editedItems)
+        val sequence = EditedMediaItemSequence.Builder(editedItems).build()
         val composition = Composition.Builder(listOf(sequence)).build()
         val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
         val transformer = Transformer.Builder(context)
@@ -693,9 +685,10 @@ private fun exportNewsPoster(
         val ratio = when (format) { "1:1" -> 1f; "16:9" -> 16f / 9f; else -> 4f / 5f }
         val width = 1080
         val height = (width / ratio).toInt()
-        outputBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(outputBitmap)
-        val src = sourceBitmap
+        val posterBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        outputBitmap = posterBitmap
+        val canvas = Canvas(posterBitmap)
+        val src = sourceBitmap ?: throw IllegalStateException("Foto sumber tidak dapat dibaca.")
         val scale = maxOf(width.toFloat() / src.width, height.toFloat() / src.height)
         val scaledWidth = src.width * scale
         val scaledHeight = src.height * scale
@@ -731,7 +724,7 @@ private fun exportNewsPoster(
             } catch (_: Exception) { }
         }
         context.contentResolver.openOutputStream(destination, "w")?.use { output ->
-            if (!outputBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) throw IllegalStateException("Gagal menyimpan PNG.")
+            if (!posterBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) throw IllegalStateException("Gagal menyimpan PNG.")
         } ?: throw IllegalStateException("Lokasi penyimpanan tidak dapat dibuka.")
         onStatus("Poster berhasil diekspor sebagai PNG.")
     } catch (error: Exception) {
