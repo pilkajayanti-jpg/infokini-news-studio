@@ -10,14 +10,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +45,7 @@ internal fun ProjectManagerScreen() {
     var category by remember { mutableStateOf("Berita") }
     var search by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("Proyek tersimpan lokal. Buat cadangan agar data dapat dipindahkan.") }
+    var deleteTarget by remember { mutableStateOf<StudioProject?>(null) }
 
     val exportBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) {
@@ -122,7 +126,7 @@ internal fun ProjectManagerScreen() {
         if (visibleProjects.isEmpty()) {
             Text("Tidak ada proyek yang cocok. Buat proyek baru atau ubah kata pencarian.", color = Color(0xFF9FB3C9))
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(visibleProjects, key = { it.id }) { project ->
                     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF10243D))) {
                         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -139,23 +143,49 @@ internal fun ProjectManagerScreen() {
                                     message = "Mengedit: ${project.title}"
                                 }) { Text("Edit") }
                                 OutlinedButton(onClick = {
-                                    val copy = repository.duplicate(project.id)
-                                    if (copy != null) {
-                                        projects.add(0, copy)
-                                        message = "Salinan proyek dibuat."
+                                    try {
+                                        val copy = repository.duplicate(project.id)
+                                        if (copy != null) {
+                                            projects.add(0, copy)
+                                            message = "Salinan proyek berhasil dibuat."
+                                        } else {
+                                            message = "Proyek sumber tidak ditemukan."
+                                        }
+                                    } catch (error: Exception) {
+                                        message = error.localizedMessage ?: "Gagal menggandakan proyek."
                                     }
                                 }) { Text("Duplikat") }
-                                OutlinedButton(onClick = {
-                                    repository.delete(project.id)
-                                    projects.removeAll { it.id == project.id }
-                                    if (editingId == project.id) resetForm()
-                                    message = "Proyek dihapus."
-                                }) { Text("Hapus") }
+                                OutlinedButton(onClick = { deleteTarget = project }) { Text("Hapus") }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Hapus proyek?") },
+            text = { Text("Proyek '${target.title}' akan dihapus dari penyimpanan perangkat. Tindakan ini tidak dapat dibatalkan.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    try {
+                        repository.delete(target.id)
+                        projects.removeAll { it.id == target.id }
+                        if (editingId == target.id) resetForm()
+                        message = "Proyek berhasil dihapus."
+                    } catch (error: Exception) {
+                        message = error.localizedMessage ?: "Gagal menghapus proyek."
+                    } finally {
+                        deleteTarget = null
+                    }
+                }) { Text("Hapus") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("Batal") }
+            }
+        )
     }
 }
