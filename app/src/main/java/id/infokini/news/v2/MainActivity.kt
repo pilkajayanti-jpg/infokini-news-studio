@@ -1,6 +1,14 @@
 package id.infokini.news.v2
 
 import android.os.Bundle
+import androidx.lifecycle.LifecycleOwner
+import androidx.camera.view.PreviewView
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.core.Preview
+import androidx.camera.core.CameraSelector
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
+import android.Manifest
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -232,11 +240,33 @@ private fun LiveScreen(
     ticker: String,
     onTicker: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    var cameraGranted by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }
+    var frontCamera by remember { mutableStateOf(false) }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        cameraGranted = granted
+    }
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("LIVE STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        Text("KAMERA LIVE PREVIEW", color = Muted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        if (cameraGranted) {
+            CameraPreview(frontCamera = frontCamera, modifier = Modifier.fillMaxWidth().height(210.dp))
+            OutlinedButton(onClick = { frontCamera = !frontCamera }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (frontCamera) "Gunakan kamera belakang" else "Gunakan kamera depan")
+            }
+        } else {
+            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Izin kamera diperlukan untuk menampilkan pratinjau siaran.", color = SoftWhite, fontSize = 12.sp)
+                    Button(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) { Text("Izinkan kamera") }
+                }
+            }
+        }
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(16.dp)) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -256,6 +286,45 @@ private fun LiveScreen(
         OutlinedTextField(value = ticker, onValueChange = onTicker, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
         Text("Pratinjau grafis ini belum mengirim siaran. Koneksi YouTube/RTMP, kamera dan encoder akan menjadi tahap implementasi Live Studio berikutnya.", color = Muted, fontSize = 11.sp)
     }
+}
+
+@Composable
+private fun CameraPreview(frontCamera: Boolean, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val lifecycleOwner = context as LifecycleOwner
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            val previewView = PreviewView(ctx)
+            val providerFuture = ProcessCameraProvider.getInstance(ctx)
+            providerFuture.addListener({
+                try {
+                    val provider = providerFuture.get()
+                    val preview = Preview.Builder().build().also {
+                        it.surfaceProvider = previewView.surfaceProvider
+                    }
+                    val selector = if (frontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+                    provider.unbindAll()
+                    provider.bindToLifecycle(lifecycleOwner, selector, preview)
+                } catch (_: Exception) {
+                    // Camera unavailable: keep the preview surface empty without crashing the studio.
+                }
+            }, ContextCompat.getMainExecutor(ctx))
+            previewView
+        },
+        update = { view ->
+            val providerFuture = ProcessCameraProvider.getInstance(context)
+            providerFuture.addListener({
+                try {
+                    val provider = providerFuture.get()
+                    val preview = Preview.Builder().build().also { it.surfaceProvider = view.surfaceProvider }
+                    val selector = if (frontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+                    provider.unbindAll()
+                    provider.bindToLifecycle(lifecycleOwner, selector, preview)
+                } catch (_: Exception) { }
+            }, ContextCompat.getMainExecutor(context))
+        }
+    )
 }
 
 @Composable
