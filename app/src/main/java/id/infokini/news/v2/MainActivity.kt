@@ -1264,10 +1264,38 @@ private fun TemplateScreen(onApply: (String, String, String) -> Unit) {
                 colors = CardDefaults.cardColors(containerColor = if (chosen == index) Color(0xFF173B5C) else Panel),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val accent = when (preset.first) {
+                        "Berita Daerah" -> Color(0xFF13BDEB)
+                        "Olahraga" -> Color(0xFF176B45)
+                        "Wawancara" -> Color(0xFF13BDEB)
+                        "Promosi UMKM" -> Color(0xFFD6A437)
+                        else -> Color(0xFFB51F2A)
+                    }
+                    Box(
+                        Modifier.fillMaxWidth().height(126.dp).background(Color(0xFF071426)),
+                        contentAlignment = Alignment.BottomStart
+                    ) {
+                        Column(
+                            Modifier.fillMaxWidth().background(Color(0xDD071426)).padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("INFOKINI.NEWS", color = Color.White, fontWeight = FontWeight.Black, fontSize = 10.sp)
+                                Text(preset.first.uppercase(), color = Cyan, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                            }
+                            Text(
+                                preset.second,
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 15.sp,
+                                modifier = Modifier.fillMaxWidth().background(accent).padding(horizontal = 7.dp, vertical = 5.dp)
+                            )
+                            Text(preset.third, color = Color.White, fontSize = 9.sp, maxLines = 1)
+                        }
+                    }
                     Text(preset.first, color = if (chosen == index) Cyan else SoftWhite, fontWeight = FontWeight.Bold)
-                    Text(preset.second, color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                    Text(preset.third, color = Muted, fontSize = 11.sp)
+                    Text("Paket grafis siap diterapkan ke Video Studio", color = Muted, fontSize = 10.sp)
                 }
             }
         }
