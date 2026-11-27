@@ -245,46 +245,99 @@ private fun LiveScreen(
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
     var frontCamera by remember { mutableStateOf(false) }
+    var logoUri by remember { mutableStateOf<Uri?>(null) }
+    var showSports by remember { mutableStateOf(false) }
+    var homeName by remember { mutableStateOf("TIM A") }
+    var awayName by remember { mutableStateOf("TIM B") }
+    var homeScore by remember { mutableStateOf(0) }
+    var awayScore by remember { mutableStateOf(0) }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
     }
+    val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
+    val dateLabel = java.text.SimpleDateFormat("EEEE, dd MMMM yyyy", Locale("id", "ID")).format(java.util.Date())
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("LIVE STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
-        Text("KAMERA LIVE PREVIEW", color = Muted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        Text("KAMERA DAN GRAFIS SIARAN", color = Muted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
         if (cameraGranted) {
-            CameraPreview(frontCamera = frontCamera, modifier = Modifier.fillMaxWidth().height(210.dp))
-            OutlinedButton(onClick = { frontCamera = !frontCamera }, modifier = Modifier.fillMaxWidth()) {
-                Text(if (frontCamera) "Gunakan kamera belakang" else "Gunakan kamera depan")
+            Box(Modifier.fillMaxWidth().height(235.dp)) {
+                CameraPreview(frontCamera = frontCamera, modifier = Modifier.fillMaxSize())
+                Column(
+                    Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                        .background(Color(0xCC071426)).padding(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (logoUri != null) {
+                            AndroidView(
+                                factory = { ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER; setImageURI(logoUri) } },
+                                update = { it.setImageURI(logoUri) },
+                                modifier = Modifier.width(42.dp).height(32.dp)
+                            )
+                        } else {
+                            Text("IK", color = Color.White, modifier = Modifier.background(Red, RoundedCornerShape(4.dp)).padding(horizontal = 7.dp, vertical = 4.dp), fontWeight = FontWeight.Black)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("INFOKINI NEWS", color = Color.White, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                            Text(dateLabel, color = Muted, fontSize = 9.sp)
+                        }
+                        Text("LIVE PREVIEW", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                    }
+                    if (headline.isNotBlank()) {
+                        Text(headline.uppercase(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp,
+                            modifier = Modifier.fillMaxWidth().background(Red).padding(7.dp))
+                    }
+                    if (showSports) {
+                        Text("$homeName  $homeScore  -  $awayScore  $awayName", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth().background(Color(0xFF123B59)).padding(6.dp))
+                    }
+                    Text(ticker, color = Color.White, fontSize = 9.sp, modifier = Modifier.fillMaxWidth().background(Color(0xFFB51F2A)).padding(6.dp))
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { frontCamera = !frontCamera }, modifier = Modifier.weight(1f)) {
+                    Text(if (frontCamera) "Kamera belakang" else "Kamera depan")
+                }
+                OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.weight(1f)) {
+                    Text(if (logoUri == null) "Pilih logo" else "Ganti logo")
+                }
             }
         } else {
             Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Izin kamera diperlukan untuk menampilkan pratinjau siaran.", color = SoftWhite, fontSize = 12.sp)
+                    Text("Izin kamera diperlukan untuk menampilkan pratinjau grafis di atas kamera.", color = SoftWhite, fontSize = 12.sp)
                     Button(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) { Text("Izinkan kamera") }
+                    OutlinedButton(onClick = { logoPicker.launch("image/*") }) { Text("Pilih logo kanal") }
                 }
             }
         }
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(16.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("IK", color = Color.White, modifier = Modifier.background(Red, RoundedCornerShape(5.dp)).padding(7.dp), fontWeight = FontWeight.Black)
-                    Spacer(Modifier.width(8.dp))
-                    Text("INFO KINI NEWS", color = Color.White, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.weight(1f))
-                    Text("PREVIEW", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.height(48.dp))
-                Text(if (headline.isBlank()) "JUDUL BERITA ANDA" else headline.uppercase(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
-                Spacer(Modifier.height(8.dp))
-                Text(ticker, color = Color.White, fontSize = 10.sp, modifier = Modifier.fillMaxWidth().background(Red).padding(8.dp))
+        OutlinedTextField(value = headline, onValueChange = onHeadline, modifier = Modifier.fillMaxWidth(), label = { Text("Judul berita / headline TV") })
+        OutlinedTextField(value = ticker, onValueChange = onTicker, modifier = Modifier.fillMaxWidth(), label = { Text("Running text / berita berjalan") })
+        OutlinedButton(onClick = { showSports = !showSports }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (showSports) "Nonaktifkan grafis olahraga" else "Tambahkan grafis olahraga")
+        }
+        if (showSports) {
+            Text("PAPAN SKOR SIARAN", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            OutlinedTextField(value = homeName, onValueChange = { homeName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama tim kandang") }, singleLine = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { if (homeScore > 0) homeScore-- }) { Text("−") }
+                Text("$homeScore", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 20.sp)
+                Button(onClick = { homeScore++ }) { Text("+") }
+                Text("SKOR", color = Muted, fontSize = 10.sp)
+            }
+            OutlinedTextField(value = awayName, onValueChange = { awayName = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Nama tim tandang") }, singleLine = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { if (awayScore > 0) awayScore-- }) { Text("−") }
+                Text("$awayScore", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 20.sp)
+                Button(onClick = { awayScore++ }) { Text("+") }
             }
         }
-        OutlinedTextField(value = headline, onValueChange = onHeadline, modifier = Modifier.fillMaxWidth(), label = { Text("Judul berita") }, singleLine = true)
-        OutlinedTextField(value = ticker, onValueChange = onTicker, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
-        Text("Pratinjau grafis ini belum mengirim siaran. Koneksi YouTube/RTMP, kamera dan encoder akan menjadi tahap implementasi Live Studio berikutnya.", color = Muted, fontSize = 11.sp)
+        Text("Logo, tanggal, headline, running text, dan papan skor opsional tampil pada pratinjau kamera. Ini masih komposisi grafis lokal; belum dikirim ke encoder atau siaran RTMP/YouTube.", color = Muted, fontSize = 11.sp)
     }
 }
 
