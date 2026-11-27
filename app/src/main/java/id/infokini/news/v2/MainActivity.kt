@@ -128,6 +128,7 @@ private fun InfoKiniStudioV2() {
     var selected by remember { mutableStateOf("Beranda") }
     var headline by remember { mutableStateOf("") }
     var ticker by remember { mutableStateOf("INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
+    var videoTemplate by remember { mutableStateOf("Breaking News") }
     val navigation = listOf("Beranda", "Live", "Video", "Foto", "Redaktur", "Lainnya")
 
     MaterialTheme(
@@ -148,12 +149,12 @@ private fun InfoKiniStudioV2() {
                     when (selected) {
                         "Beranda" -> HomeScreen(onOpen = { selected = it })
                         "Live" -> LiveScreen(headline, { headline = it }, ticker, { ticker = it })
-                        "Video" -> VideoStudioScreen()
+                        "Video" -> VideoStudioScreen(headline, { headline = it }, ticker, { ticker = it }, videoTemplate, { videoTemplate = it })
                         "Foto" -> PhotoStudioScreen()
                         "Redaktur", "AI Redaktur" -> EditorialScreen()
                         "Narasi / TTS" -> TtsScreen()
                         "Grafis Olahraga", "Berita Olahraga" -> SportsScreen()
-                        "Template Berita" -> TemplateScreen(onApply = { title, line -> headline = title; ticker = line; selected = "Video" })
+                        "Template Berita" -> TemplateScreen(onApply = { style, title, line -> videoTemplate = style; headline = title; ticker = line; selected = "Video" })
                         "Lainnya" -> MoreScreen(onOpen = { module ->
                             selected = when (module) {
                                 "Live Studio" -> "Live"
@@ -597,12 +598,18 @@ private fun CameraPreview(frontCamera: Boolean, modifier: Modifier = Modifier) {
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun VideoStudioScreen() {
+private fun VideoStudioScreen(
+    headline: String,
+    onHeadline: (String) -> Unit,
+    ticker: String,
+    onTicker: (String) -> Unit,
+    templateStyle: String,
+    onTemplateStyle: (String) -> Unit
+) {
     val context = LocalContext.current
     var videoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
-    val previewUri = videoUris.firstOrNull()
-    var headline by remember { mutableStateOf("") }
-    var ticker by remember { mutableStateOf("INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
+    var selectedClipIndex by remember { mutableStateOf(0) }
+    val previewUri = videoUris.getOrNull(selectedClipIndex) ?: videoUris.firstOrNull()
     var logoUri by remember { mutableStateOf<Uri?>(null) }
     var showSports by remember { mutableStateOf(false) }
     var homeName by remember { mutableStateOf("TIM A") }
@@ -612,7 +619,7 @@ private fun VideoStudioScreen() {
     var exportStatus by remember { mutableStateOf("Pilih video untuk mulai mengedit.") }
     var trimStartSeconds by remember { mutableStateOf("0") }
     var trimEndSeconds by remember { mutableStateOf("0") }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { videoUris = it }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { picked -> videoUris = picked; selectedClipIndex = 0 }
     val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
         val sources = videoUris
@@ -623,7 +630,7 @@ private fun VideoStudioScreen() {
                 exportStatus = "Rentang potong tidak valid. Waktu akhir harus lebih besar dari waktu awal."
             } else {
                 exportVideoWithNewsOverlay(
-                    context, sources, destination, headline, ticker, logoUri,
+                    context, sources, destination, headline, ticker, logoUri, templateStyle,
                     if (showSports) "$homeName  $homeScore - $awayScore  $awayName" else null,
                     startSeconds * 1000L, endSeconds * 1000L
                 ) { exportStatus = it }
@@ -632,10 +639,29 @@ private fun VideoStudioScreen() {
     }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("VIDEO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
-        Text("Pilih video dari perangkat untuk dipratinjau dan siapkan teks grafis berita.", color = Muted, fontSize = 12.sp)
-        Button(onClick = { picker.launch("video/*") }, modifier = Modifier.fillMaxWidth()) { Text("Pilih satu atau beberapa video") }
+        Text("Pilih klip, susun urutannya, tentukan gaya grafis berita, lalu ekspor menjadi MP4.", color = Muted, fontSize = 12.sp)
+        Button(onClick = { picker.launch("video/*") }, modifier = Modifier.fillMaxWidth()) { Text("Tambah video dari galeri") }
+        Text("TEMPLATE GRAFIS VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            listOf("Breaking News", "Berita Daerah", "Olahraga", "Wawancara", "Promosi UMKM").forEach { style ->
+                if (templateStyle == style) Button(onClick = { onTemplateStyle(style) }) { Text(style, fontSize = 10.sp) }
+                else OutlinedButton(onClick = { onTemplateStyle(style) }) { Text(style, fontSize = 10.sp) }
+            }
+        }
+        Text("Gaya aktif: $templateStyle", color = Gold, fontSize = 10.sp)
         if (videoUris.isNotEmpty()) {
-            Text("${videoUris.size} klip dipilih — urutan mengikuti pilihan dari galeri.", color = Cyan, fontSize = 11.sp)
+            Text("${videoUris.size} klip dalam daftar edit. Pilih klip untuk pratinjau dan atur urutan sebelum ekspor.", color = Cyan, fontSize = 11.sp)
+            videoUris.forEachIndexed { index, uri ->
+                Card(colors = CardDefaults.cardColors(containerColor = if (selectedClipIndex == index) Color(0xFF173B5C) else Panel), shape = RoundedCornerShape(10.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("KLIP ${index + 1}", color = if (selectedClipIndex == index) Cyan else SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = { selectedClipIndex = index }) { Text("Pratinjau") }
+                        OutlinedButton(onClick = { if (index > 0) { val list = videoUris.toMutableList(); val item = list.removeAt(index); list.add(index - 1, item); videoUris = list; selectedClipIndex = index - 1 } }, enabled = index > 0) { Text("↑") }
+                        OutlinedButton(onClick = { if (index < videoUris.lastIndex) { val list = videoUris.toMutableList(); val item = list.removeAt(index); list.add(index + 1, item); videoUris = list; selectedClipIndex = index + 1 } }, enabled = index < videoUris.lastIndex) { Text("↓") }
+                        OutlinedButton(onClick = { videoUris = videoUris.toMutableList().also { it.removeAt(index) }; selectedClipIndex = (selectedClipIndex.coerceAtMost((videoUris.size - 1).coerceAtLeast(0))) }) { Text("Hapus") }
+                    }
+                }
+            }
             AndroidView(
                 factory = { ctx ->
                     VideoView(ctx).apply {
@@ -724,6 +750,7 @@ private fun exportVideoWithNewsOverlay(
     headline: String,
     ticker: String,
     logoUri: Uri?,
+    templateStyle: String,
     sportsScore: String?,
     startPositionMs: Long,
     endPositionMs: Long,
@@ -736,12 +763,46 @@ private fun exportVideoWithNewsOverlay(
         val red = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(190, 35, 48) }
         val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = 30f; typeface = Typeface.create("sans-serif", Typeface.BOLD) }
         val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.LTGRAY; textSize = 20f }
-        canvas.drawRect(0f, 570f, 1280f, 720f, panel)
-        canvas.drawRect(0f, 625f, 1280f, 680f, red)
-        canvas.drawText("INFOKINI NEWS  •  " + java.text.SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(java.util.Date()), 34f, 610f, small)
+        val dateText = "INFOKINI.NEWS  •  " + java.text.SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(java.util.Date())
         val safeHeadline = headline.ifBlank { "INFO TERKINI" }.take(62)
-        canvas.drawText(safeHeadline, 34f, 662f, white)
-        canvas.drawText(ticker.ifBlank { "INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN" }.take(105), 34f, 705f, small)
+        val safeTicker = ticker.ifBlank { "INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN" }.take(105)
+        when (templateStyle) {
+            "Berita Daerah" -> {
+                canvas.drawRect(0f, 565f, 1280f, 720f, panel)
+                canvas.drawRect(0f, 565f, 14f, 720f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(19, 189, 235) })
+                canvas.drawText(dateText, 38f, 603f, small)
+                canvas.drawText(safeHeadline, 38f, 653f, white)
+                canvas.drawText(safeTicker, 38f, 705f, small)
+            }
+            "Olahraga" -> {
+                canvas.drawRect(0f, 570f, 1280f, 720f, panel)
+                canvas.drawRect(0f, 570f, 1280f, 610f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(18, 59, 89) })
+                canvas.drawText("INFOKINI SPORT  •  $dateText", 34f, 598f, small)
+                canvas.drawText(safeHeadline, 34f, 660f, white)
+                canvas.drawText(safeTicker, 34f, 705f, small)
+            }
+            "Wawancara" -> {
+                canvas.drawRect(0f, 590f, 1280f, 720f, panel)
+                canvas.drawRect(0f, 590f, 1280f, 600f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(19, 189, 235) })
+                canvas.drawText(dateText, 38f, 630f, small)
+                canvas.drawText(safeHeadline, 38f, 675f, white)
+                canvas.drawText(safeTicker, 38f, 710f, small)
+            }
+            "Promosi UMKM" -> {
+                canvas.drawRect(0f, 570f, 1280f, 720f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(225, 28, 24, 12) })
+                canvas.drawRect(0f, 570f, 1280f, 580f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(218, 164, 55) })
+                canvas.drawText("INFO KINI  •  PROMOSI UMKM", 34f, 610f, small)
+                canvas.drawText(safeHeadline, 34f, 662f, white)
+                canvas.drawText(safeTicker, 34f, 705f, small)
+            }
+            else -> {
+                canvas.drawRect(0f, 570f, 1280f, 720f, panel)
+                canvas.drawRect(0f, 625f, 1280f, 680f, red)
+                canvas.drawText(dateText, 34f, 610f, small)
+                canvas.drawText(safeHeadline, 34f, 662f, white)
+                canvas.drawText(safeTicker, 34f, 705f, small)
+            }
+        }
         if (!sportsScore.isNullOrBlank()) {
             val sportPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = android.graphics.Color.WHITE
@@ -1182,11 +1243,12 @@ private fun MoreScreen(onOpen: (String) -> Unit) {
 }
 
 @Composable
-private fun TemplateScreen(onApply: (String, String) -> Unit) {
+private fun TemplateScreen(onApply: (String, String, String) -> Unit) {
     val presets = listOf(
         Triple("Breaking News", "BREAKING NEWS", "INFO TERKINI | PERKEMBANGAN BERITA TERBARU"),
         Triple("Berita Daerah", "KABAR DAERAH", "INFO WILAYAH | FAKTA, DATA, DAN KONFIRMASI"),
         Triple("Olahraga", "INFO OLAHRAGA", "HASIL PERTANDINGAN | SKOR DAN KABAR TERKINI"),
+        Triple("Wawancara", "DIALOG / WAWANCARA", "INFO KINI | SUARA DAN PENDAPAT NARASUMBER"),
         Triple("Promosi UMKM", "PRODUK LOKAL UNGGULAN", "DUKUNG UMKM DAERAH | PRODUK ASLI INDONESIA")
     )
     var chosen by remember { mutableStateOf(0) }
@@ -1209,7 +1271,7 @@ private fun TemplateScreen(onApply: (String, String) -> Unit) {
                 }
             }
         }
-        Button(onClick = { onApply(presets[chosen].second, presets[chosen].third) }, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = { onApply(presets[chosen].first, presets[chosen].second, presets[chosen].third) }, modifier = Modifier.fillMaxWidth()) {
             Text("Gunakan template di Video Studio")
         }
         Text("Template ini mengisi judul dan running text awal. Logo, gambar, warna lanjutan, dan animasi dapat disesuaikan pada tahap pengembangan berikutnya.", color = Muted, fontSize = 11.sp)
