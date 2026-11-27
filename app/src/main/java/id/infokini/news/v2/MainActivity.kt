@@ -612,6 +612,8 @@ private fun VideoStudioScreen(
     var videoSegments by remember { mutableStateOf<List<VideoSegment>>(emptyList()) }
     var selectedClipIndex by remember { mutableStateOf(0) }
     val previewUri = videoSegments.getOrNull(selectedClipIndex)?.uri
+    val previewStartMs = (videoSegments.getOrNull(selectedClipIndex)?.startSeconds?.toLongOrNull() ?: 0L).coerceAtLeast(0L) * 1000L
+    val previewKey = "${previewUri}|${previewStartMs}"
     var logoUri by remember { mutableStateOf<Uri?>(null) }
     var showSports by remember { mutableStateOf(false) }
     var homeName by remember { mutableStateOf("TIM A") }
@@ -624,14 +626,21 @@ private fun VideoStudioScreen(
     var splitAtSeconds by remember { mutableStateOf("") }
     var reporterName by remember { mutableStateOf("") }
     var locationName by remember { mutableStateOf("") }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { picked ->
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { picked ->
+        picked.forEach { uri ->
+            try { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
+        }
         videoSegments = picked.map { VideoSegment(uri = it) }
         selectedClipIndex = 0
         trimStartSeconds = "0"
         trimEndSeconds = "0"
         splitAtSeconds = ""
+        exportStatus = if (picked.isEmpty()) "Tidak ada video yang dipilih." else "${picked.size} video berhasil dimasukkan ke timeline."
     }
-    val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
+    val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { pickedLogo ->
+        logoUri = pickedLogo
+        if (pickedLogo != null) try { context.contentResolver.takePersistableUriPermission(pickedLogo, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
+    }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
         val sources = videoSegments
         if (destination != null && sources.isNotEmpty()) {
@@ -655,7 +664,7 @@ private fun VideoStudioScreen(
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("VIDEO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
         Text("Pilih klip, susun urutannya, tentukan gaya grafis berita, lalu ekspor menjadi MP4.", color = Muted, fontSize = 12.sp)
-        Button(onClick = { picker.launch("video/*") }, modifier = Modifier.fillMaxWidth()) { Text("Tambah video dari galeri") }
+        Button(onClick = { picker.launch(arrayOf("video/*")) }, modifier = Modifier.fillMaxWidth()) { Text("Tambah video ke timeline") }
         Text("TEMPLATE GRAFIS VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             listOf("Breaking News", "Berita Daerah", "Olahraga", "Wawancara", "Promosi UMKM").forEach { style ->
@@ -716,12 +725,13 @@ private fun VideoStudioScreen(
                 AndroidView(
                     factory = { ctx ->
                         VideoView(ctx).apply {
-                            tag = previewUri.toString()
+                            tag = previewKey
                             setMediaController(MediaController(ctx).also { it.setAnchorView(this) })
                             setOnPreparedListener { player: MediaPlayer ->
                                 player.isLooping = false
+                                if (previewStartMs > 0L) seekTo(previewStartMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
                                 start()
-                                exportStatus = "Video siap diputar. Grafis template ditampilkan pada pratinjau."
+                                exportStatus = "Pratinjau segmen dimulai dari detik ${previewStartMs / 1000L}."
                             }
                             setOnErrorListener { _, what, extra ->
                                 exportStatus = "Video tidak dapat diputar (kode $what/$extra). Pilih berkas video MP4 lain."
@@ -731,9 +741,15 @@ private fun VideoStudioScreen(
                         }
                     },
                     update = { view ->
-                        if (view.tag != previewUri.toString()) {
-                            view.tag = previewUri.toString()
+                        if (view.tag != previewKey) {
+                            view.tag = previewKey
                             view.stopPlayback()
+                            view.setOnPreparedListener { player: MediaPlayer ->
+                                player.isLooping = false
+                                if (previewStartMs > 0L) view.seekTo(previewStartMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                                view.start()
+                                exportStatus = "Pratinjau segmen dimulai dari detik ${previewStartMs / 1000L}."
+                            }
                             view.setVideoURI(previewUri)
                         }
                     },
@@ -821,7 +837,7 @@ private fun VideoStudioScreen(
             enabled = videoSegments.isNotEmpty(),
             modifier = Modifier.fillMaxWidth()
         ) { Text("Pisahkan klip pada titik tersebut") }
-        OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { logoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth()) {
             Text(if (logoUri == null) "Pilih logo kanal dari HP" else "Ganti logo kanal")
         }
         OutlinedButton(onClick = { showSports = !showSports }, modifier = Modifier.fillMaxWidth()) {
