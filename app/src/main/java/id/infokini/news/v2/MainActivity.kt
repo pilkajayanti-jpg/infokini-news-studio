@@ -151,14 +151,14 @@ private fun InfoKiniStudioV2() {
                     when (selected) {
                         "Beranda" -> HomeScreen(onOpen = { selected = it })
                         "Live" -> LiveScreen(headline, { headline = it }, ticker, { ticker = it })
-                        "Video" -> VideoStudioScreen(headline, { headline = it }, ticker, { ticker = it }, videoTemplate, { videoTemplate = it })
+                        "Video", "Template Berita" -> VideoStudioScreen(headline, { headline = it }, ticker, { ticker = it }, videoTemplate, { videoTemplate = it }, showTemplateLibraryInitially = selected == "Template Berita")
                         "Foto" -> PhotoStudioScreen()
                         "Proyek Saya" -> ProjectManagerScreen()
                         "Galeri Media" -> MediaLibraryScreen()
                         "Redaktur", "AI Redaktur" -> EditorialScreen()
                         "Narasi / TTS" -> TtsScreen()
                         "Grafis Olahraga", "Berita Olahraga" -> SportsScreen()
-                        "Template Berita" -> TemplateScreen(onApply = { style, title, line -> videoTemplate = style; headline = title; ticker = line; selected = "Video" })
+                        "Template Berita" -> { selected = "Video" }
                         "Lainnya" -> MoreScreen(onOpen = { module ->
                             selected = when (module) {
                                 "Live Studio" -> "Live"
@@ -610,9 +610,11 @@ private fun VideoStudioScreen(
     ticker: String,
     onTicker: (String) -> Unit,
     templateStyle: String,
-    onTemplateStyle: (String) -> Unit
+    onTemplateStyle: (String) -> Unit,
+    showTemplateLibraryInitially: Boolean = false
 ) {
     val context = LocalContext.current
+    var showTemplateLibrary by remember { mutableStateOf(showTemplateLibraryInitially) }
     var videoSegments by remember { mutableStateOf<List<VideoSegment>>(emptyList()) }
     var selectedClipIndex by remember { mutableStateOf(0) }
     val previewUri = videoSegments.getOrNull(selectedClipIndex)?.uri
@@ -669,36 +671,63 @@ private fun VideoStudioScreen(
         Text("VIDEO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
         Text("Pilih klip, susun urutannya, tentukan gaya grafis berita, lalu ekspor menjadi MP4.", color = Muted, fontSize = 12.sp)
         Button(onClick = { picker.launch(arrayOf("video/*")) }, modifier = Modifier.fillMaxWidth()) { Text("Tambah video ke timeline") }
-        Text("TEMPLATE GRAFIS VIDEO", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            listOf("Breaking News", "Berita Daerah", "Olahraga", "Wawancara", "Promosi UMKM").forEach { style ->
-                val selected = templateStyle == style
-                val accent = when (style) {
-                    "Olahraga" -> Color(0xFF17608A)
-                    "Promosi UMKM" -> Color(0xFF9B7020)
-                    "Berita Daerah" -> Color(0xFF087D91)
-                    "Wawancara" -> Color(0xFF263D55)
-                    else -> Color(0xFFB51F2A)
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("TEMPLATE DI DALAM EDITOR", color = Cyan, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                        Text("Pilih desain, lalu langsung edit judul, video, logo, dan teks berjalan.", color = Muted, fontSize = 10.sp)
+                    }
+                    OutlinedButton(onClick = { showTemplateLibrary = !showTemplateLibrary }) { Text(if (showTemplateLibrary) "Tutup" else "Pilih template") }
                 }
-                Card(
-                    onClick = { onTemplateStyle(style) },
-                    modifier = Modifier.width(154.dp).height(104.dp),
-                    colors = CardDefaults.cardColors(containerColor = if (selected) Color(0xFF214A69) else Panel),
-                    border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, Cyan) else null
-                ) {
-                    Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                        Text(style.uppercase(), color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                        Column(Modifier.fillMaxWidth().background(accent).padding(6.dp)) {
-                            Text("INFO KINI", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                            Text("JUDUL BERITA ANDA", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                            Text("infokini.news  •  RUNNING TEXT", color = Color.White, fontSize = 6.sp, maxLines = 1)
+                Text("Desain aktif: $templateStyle", color = Gold, fontSize = 10.sp)
+                if (showTemplateLibrary) {
+                    val presets = listOf(
+                        Triple("Breaking News", "BREAKING NEWS", "INFO TERKINI | PERKEMBANGAN BERITA TERBARU"),
+                        Triple("Berita Daerah", "KABAR DAERAH", "INFO WILAYAH | FAKTA, DATA, DAN KONFIRMASI"),
+                        Triple("Olahraga", "INFO OLAHRAGA", "HASIL PERTANDINGAN | SKOR DAN KABAR TERKINI"),
+                        Triple("Wawancara", "DIALOG / WAWANCARA", "INFO KINI | SUARA DAN PENDAPAT NARASUMBER"),
+                        Triple("Promosi UMKM", "PRODUK LOKAL UNGGULAN", "DUKUNG UMKM DAERAH | PRODUK ASLI INDONESIA")
+                    )
+                    presets.forEach { preset ->
+                        val accent = when (preset.first) {
+                            "Berita Daerah" -> Color(0xFF087D91)
+                            "Olahraga" -> Color(0xFF17608A)
+                            "Wawancara" -> Color(0xFF263D55)
+                            "Promosi UMKM" -> Color(0xFF9B7020)
+                            else -> Color(0xFFB51F2A)
                         }
-                        Text(if (selected) "TEMPLATE DIPILIH" else "PILIH TEMPLATE", color = if (selected) Cyan else Muted, fontSize = 8.sp)
+                        Card(
+                            onClick = {
+                                onTemplateStyle(preset.first)
+                                onHeadline(preset.second)
+                                onTicker(preset.third)
+                                showTemplateLibrary = false
+                                exportStatus = "Template ${preset.first} diterapkan. Judul dan running text sudah dimasukkan; lanjutkan mengedit video."
+                            },
+                            colors = CardDefaults.cardColors(containerColor = if (templateStyle == preset.first) Color(0xFF173B5C) else Color(0xFF09182A)),
+                            border = if (templateStyle == preset.first) androidx.compose.foundation.BorderStroke(2.dp, Cyan) else null,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(preset.first.uppercase(), color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 10.sp)
+                                    Text(if (templateStyle == preset.first) "AKTIF" else "PAKAI DESAIN", color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Box(Modifier.fillMaxWidth().height(76.dp).background(Color(0xFF02070D)), contentAlignment = Alignment.BottomStart) {
+                                    Column(Modifier.fillMaxWidth().background(Color(0xE6071426)).padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text("INFOKINI.NEWS  •  ${preset.first.uppercase()}", color = Cyan, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                                        Text(preset.second, Modifier.fillMaxWidth().background(accent).padding(horizontal = 6.dp, vertical = 4.dp), color = Color.White, fontWeight = FontWeight.Black, fontSize = 12.sp, maxLines = 1)
+                                        Text(preset.third, color = Color.White, fontSize = 7.sp, maxLines = 1)
+                                    }
+                                }
+                                Text("Ketuk untuk menerapkan ke proyek editor", color = Muted, fontSize = 9.sp)
+                            }
+                        }
                     }
                 }
             }
         }
-        Text("Gaya aktif: $templateStyle", color = Gold, fontSize = 10.sp)
         if (videoSegments.isNotEmpty()) {
             Text("${videoSegments.size} segmen dalam daftar edit. Setiap segmen dapat dipotong dan diatur urutannya secara mandiri.", color = Cyan, fontSize = 11.sp)
             videoSegments.forEachIndexed { index, segment ->
