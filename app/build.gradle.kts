@@ -41,6 +41,8 @@ dependencies {
     implementation("androidx.media3:media3-common:1.5.1")
     implementation("androidx.media3:media3-transformer:1.5.1")
     implementation("androidx.media3:media3-effect:1.5.1")
+    // RTMP/RTMPS streaming engine foundation.
+    implementation("com.github.pedroSG94.RootEncoder:library:2.8.1")
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
