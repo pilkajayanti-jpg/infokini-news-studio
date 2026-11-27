@@ -1,6 +1,8 @@
 package id.infokini.news.v2
 
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -27,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,6 +106,7 @@ private fun InfoKiniStudioV2() {
                         "Video" -> SimpleScreen("Video Studio", "Ruang kerja editor video InfoKini. Impor klip, susun timeline, tambahkan grafis dan siapkan ekspor MP4.")
                         "Foto" -> SimpleScreen("Photo Studio", "Ruang desain poster, thumbnail, foto berita, logo dan watermark.")
                         "Redaktur" -> EditorialScreen()
+                        "Narasi / TTS" -> TtsScreen()
                         else -> MoreScreen(onOpen = { selected = it })
                     }
                 }
@@ -278,13 +282,66 @@ private fun EditorialScreen() {
 }
 
 @Composable
+private fun TtsScreen() {
+    val context = LocalContext.current
+    var script by remember { mutableStateOf("") }
+    var engine by remember { mutableStateOf<TextToSpeech?>(null) }
+    var status by remember { mutableStateOf("Menyiapkan mesin suara perangkat…") }
+
+    DisposableEffect(context) {
+        val tts = TextToSpeech(context) { result ->
+            if (result == TextToSpeech.SUCCESS) {
+                val languageResult = ttsLanguageSetup(engine = null)
+                status = if (languageResult) "Mesin TTS siap" else "Bahasa Indonesia belum tersedia; periksa paket suara di pengaturan Android"
+            } else {
+                status = "Mesin TTS tidak dapat diinisialisasi"
+            }
+        }
+        engine = tts
+        onDispose {
+            tts.stop()
+            tts.shutdown()
+            engine = null
+        }
+    }
+
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("NARASI / TEXT TO SPEECH", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        Text("Ubah naskah menjadi suara menggunakan mesin TTS yang tersedia di perangkat Android.", color = Muted, fontSize = 12.sp)
+        OutlinedTextField(value = script, onValueChange = { script = it }, modifier = Modifier.fillMaxWidth().weight(1f), label = { Text("Tempel naskah berita di sini") })
+        Text(status, color = Muted, fontSize = 11.sp)
+        Button(onClick = {
+            val tts = engine
+            if (tts != null && script.isNotBlank()) {
+                val result = tts.setLanguage(Locale("id", "ID"))
+                if (result >= TextToSpeech.LANG_AVAILABLE) {
+                    tts.speak(script, TextToSpeech.QUEUE_FLUSH, null, "infokini-narration")
+                    status = "Sedang membacakan naskah"
+                } else {
+                    status = "Paket suara Bahasa Indonesia belum tersedia di perangkat"
+                }
+            } else {
+                status = if (script.isBlank()) "Masukkan naskah terlebih dahulu" else "Mesin suara belum siap"
+            }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Bacakan naskah") }
+        OutlinedButton(onClick = { engine?.stop(); status = "Pembacaan dihentikan" }, modifier = Modifier.fillMaxWidth()) { Text("Hentikan suara") }
+        Text("Catatan: fitur ini memutar suara melalui TTS Android. Ekspor audio menjadi MP3/WAV belum tersedia.", color = Muted, fontSize = 11.sp)
+    }
+}
+
+private fun ttsLanguageSetup(engine: TextToSpeech?): Boolean {
+    if (engine == null) return false
+    return engine.setLanguage(Locale("id", "ID")) >= TextToSpeech.LANG_AVAILABLE
+}
+
+@Composable
 private fun MoreScreen(onOpen: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(modules.drop(8)) { module -> ModuleCard(module) { onOpen(module.title) } }
-        item { SimpleScreen("Menu tambahan", "Template berita, narasi TTS, olahraga, promosi UMKM, proyek, galeri, pengaturan dan panduan akan dibangun dalam tahap berikutnya.") }
+        items(modules) { module -> ModuleCard(module) { onOpen(module.title) } }
+        item { Text("Pilih modul untuk membuka ruang kerjanya.", color = Muted, fontSize = 11.sp) }
     }
 }
 
