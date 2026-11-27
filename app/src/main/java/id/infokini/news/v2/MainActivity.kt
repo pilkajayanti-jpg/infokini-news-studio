@@ -1,6 +1,14 @@
 package id.infokini.news.v2
 
 import android.os.Bundle
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.horizontalScroll
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.widget.MediaController
+import android.widget.VideoView
+import android.widget.ImageView
+import android.net.Uri
 import android.speech.tts.TextToSpeech
 import java.util.Locale
 import androidx.activity.ComponentActivity
@@ -40,7 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -104,18 +111,18 @@ private fun InfoKiniStudioV2() {
                     when (selected) {
                         "Beranda" -> HomeScreen(onOpen = { selected = it })
                         "Live" -> LiveScreen(headline, { headline = it }, ticker, { ticker = it })
-                        "Video" -> SimpleScreen("Video Studio", "Ruang kerja editor video InfoKini. Impor klip, susun timeline, tambahkan grafis dan siapkan ekspor MP4.")
-                        "Foto" -> SimpleScreen("Photo Studio", "Ruang desain poster, thumbnail, foto berita, logo dan watermark.")
-                        "Redaktur" -> EditorialScreen()
+                        "Video" -> VideoStudioScreen()
+                        "Foto" -> PhotoStudioScreen()
+                        "Redaktur", "AI Redaktur" -> EditorialScreen()
                         "Narasi / TTS" -> TtsScreen()
                         "Grafis Olahraga", "Berita Olahraga" -> SportsScreen()
-                        "Narasi / TTS" -> TtsScreen()
-                        else -> MoreScreen(onOpen = { selected = it })
+                        "Lainnya" -> MoreScreen(onOpen = { selected = it })
+                        else -> ModuleWorkspaceScreen(selected)
                     }
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth().background(Panel).padding(horizontal = 4.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth().background(Panel).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     navigation.forEach { item ->
@@ -247,6 +254,99 @@ private fun LiveScreen(
         OutlinedTextField(value = headline, onValueChange = onHeadline, modifier = Modifier.fillMaxWidth(), label = { Text("Judul berita") }, singleLine = true)
         OutlinedTextField(value = ticker, onValueChange = onTicker, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
         Text("Pratinjau grafis ini belum mengirim siaran. Koneksi YouTube/RTMP, kamera dan encoder akan menjadi tahap implementasi Live Studio berikutnya.", color = Muted, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun VideoStudioScreen() {
+    val context = LocalContext.current
+    var videoUri by remember { mutableStateOf<Uri?>(null) }
+    var headline by remember { mutableStateOf("") }
+    var ticker by remember { mutableStateOf("INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { videoUri = it }
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("VIDEO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        Text("Pilih video dari perangkat untuk dipratinjau dan siapkan teks grafis berita.", color = Muted, fontSize = 12.sp)
+        Button(onClick = { picker.launch("video/*") }, modifier = Modifier.fillMaxWidth()) { Text("Pilih video dari HP") }
+        if (videoUri != null) {
+            AndroidView(
+                factory = { ctx ->
+                    VideoView(ctx).apply {
+                        setVideoURI(videoUri)
+                        setMediaController(MediaController(ctx).also { it.setAnchorView(this) })
+                    }
+                },
+                update = { view ->
+                    if (view.tag != videoUri.toString()) {
+                        view.tag = videoUri.toString()
+                        view.setVideoURI(videoUri)
+                        view.setMediaController(MediaController(context).also { it.setAnchorView(view) })
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(220.dp)
+            )
+        } else {
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(14.dp)) {
+                Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                    Text("PRATINJAU VIDEO", color = Muted, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        OutlinedTextField(value = headline, onValueChange = { headline = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul / lower third") })
+        OutlinedTextField(value = ticker, onValueChange = { ticker = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
+        Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Grafis yang disiapkan", color = Cyan, fontWeight = FontWeight.Bold)
+                Text(if (headline.isBlank()) "Judul berita akan tampil di sini" else headline, color = SoftWhite, fontWeight = FontWeight.Bold)
+                Text(ticker, color = SoftWhite, fontSize = 11.sp)
+            }
+        }
+        Text("Yang sudah berfungsi: memilih video, memutar pratinjau, dan mengisi teks grafis. Pemotongan timeline, penggabungan klip, audio mixing, dan ekspor MP4 belum tersedia.", color = Muted, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun PhotoStudioScreen() {
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { imageUri = it }
+    var caption by remember { mutableStateOf("INFO KINI") }
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("PHOTO STUDIO", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        Text("Pilih foto untuk pratinjau dan siapkan teks poster berita.", color = Muted, fontSize = 12.sp)
+        Button(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text("Pilih foto dari HP") }
+        if (imageUri != null) {
+            AndroidView(
+                factory = { ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER; setImageURI(imageUri) } },
+                update = { it.setImageURI(imageUri) },
+                modifier = Modifier.fillMaxWidth().height(260.dp)
+            )
+        } else {
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF02070D)), shape = RoundedCornerShape(14.dp)) {
+                Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) { Text("PRATINJAU FOTO", color = Muted) }
+            }
+        }
+        OutlinedTextField(value = caption, onValueChange = { caption = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul poster / watermark") })
+        Text("INFO KINI", color = Cyan, fontWeight = FontWeight.Black)
+        Text(caption, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text("Yang sudah berfungsi: memilih dan melihat foto serta menyiapkan teks poster. Crop, filter, penghapus latar, layer desain, dan ekspor gambar belum tersedia.", color = Muted, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun ModuleWorkspaceScreen(module: String) {
+    val context = LocalContext.current
+    val prefs = remember(module) { context.getSharedPreferences("infokini_module_" + module.replace(" ", "_"), 0) }
+    var title by remember(module) { mutableStateOf(prefs.getString("title", "").orEmpty()) }
+    var notes by remember(module) { mutableStateOf(prefs.getString("notes", "").orEmpty()) }
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(module.uppercase(), color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        Text("Ruang kerja $module. Catatan yang Anda simpan akan tersimpan di perangkat ini.", color = Muted, fontSize = 12.sp)
+        OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul / nama pekerjaan") })
+        OutlinedTextField(value = notes, onValueChange = { notes = it }, modifier = Modifier.fillMaxWidth().height(180.dp), label = { Text("Catatan / materi kerja") })
+        Button(onClick = {
+            prefs.edit().putString("title", title).putString("notes", notes).apply()
+        }, modifier = Modifier.fillMaxWidth()) { Text("Simpan pekerjaan") }
+        Text("Status: ruang kerja dasar dengan penyimpanan lokal. Integrasi cloud, kolaborasi, dan fungsi khusus modul ini belum aktif.", color = Muted, fontSize = 11.sp)
     }
 }
 
