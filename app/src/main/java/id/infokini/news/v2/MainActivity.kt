@@ -409,12 +409,24 @@ private fun VideoStudioScreen() {
     var homeScore by remember { mutableStateOf(0) }
     var awayScore by remember { mutableStateOf(0) }
     var exportStatus by remember { mutableStateOf("Pilih video untuk mulai mengedit.") }
+    var trimStartSeconds by remember { mutableStateOf("0") }
+    var trimEndSeconds by remember { mutableStateOf("0") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { videoUri = it }
     val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { logoUri = it }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
         val source = videoUri
         if (destination != null && source != null) {
-            exportVideoWithNewsOverlay(context, source, destination, headline, ticker, logoUri, if (showSports) "$homeName  $homeScore - $awayScore  $awayName" else null) { exportStatus = it }
+            val startSeconds = trimStartSeconds.toLongOrNull() ?: 0L
+            val endSeconds = trimEndSeconds.toLongOrNull() ?: 0L
+            if (startSeconds < 0L || endSeconds < 0L || (endSeconds > 0L && endSeconds <= startSeconds)) {
+                exportStatus = "Rentang potong tidak valid. Waktu akhir harus lebih besar dari waktu awal."
+            } else {
+                exportVideoWithNewsOverlay(
+                    context, source, destination, headline, ticker, logoUri,
+                    if (showSports) "$homeName  $homeScore - $awayScore  $awayName" else null,
+                    startSeconds * 1000L, endSeconds * 1000L
+                ) { exportStatus = it }
+            }
         }
     }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -447,6 +459,24 @@ private fun VideoStudioScreen() {
         }
         OutlinedTextField(value = headline, onValueChange = { headline = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Judul / lower third") })
         OutlinedTextField(value = ticker, onValueChange = { ticker = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Running text") })
+        Text("POTONG VIDEO (DETIK)", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = trimStartSeconds,
+                onValueChange = { trimStartSeconds = it.filter(Char::isDigit) },
+                modifier = Modifier.weight(1f),
+                label = { Text("Mulai dari detik") },
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = trimEndSeconds,
+                onValueChange = { trimEndSeconds = it.filter(Char::isDigit) },
+                modifier = Modifier.weight(1f),
+                label = { Text("Sampai detik (0 = akhir)") },
+                singleLine = true
+            )
+        }
+        Text("Contoh: mulai 10, sampai 45 akan mengekspor bagian detik 10–45. Isi 0 pada waktu akhir untuk memakai akhir video.", color = Muted, fontSize = 10.sp)
         OutlinedButton(onClick = { logoPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
             Text(if (logoUri == null) "Pilih logo kanal dari HP" else "Ganti logo kanal")
         }
@@ -493,6 +523,8 @@ private fun exportVideoWithNewsOverlay(
     ticker: String,
     logoUri: Uri?,
     sportsScore: String?,
+    startPositionMs: Long,
+    endPositionMs: Long,
     onStatus: (String) -> Unit
 ) {
     try {
@@ -536,7 +568,15 @@ private fun exportVideoWithNewsOverlay(
         }
         val bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(overlay)
         val effects = Effects(emptyList(), listOf(OverlayEffect(listOf(bitmapOverlay))))
-        val editedItem = EditedMediaItem.Builder(MediaItem.fromUri(source)).setEffects(effects).build()
+        val clipping = MediaItem.ClippingConfiguration.Builder()
+            .setStartPositionMs(startPositionMs.coerceAtLeast(0L))
+            .apply { if (endPositionMs > startPositionMs) setEndPositionMs(endPositionMs) }
+            .build()
+        val clippedMediaItem = MediaItem.Builder()
+            .setUri(source)
+            .setClippingConfiguration(clipping)
+            .build()
+        val editedItem = EditedMediaItem.Builder(clippedMediaItem).setEffects(effects).build()
         val outputFile = File(context.cacheDir, "infokini-export-${System.currentTimeMillis()}.mp4")
         val transformer = Transformer.Builder(context)
             .addListener(object : Transformer.Listener {
