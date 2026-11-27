@@ -153,6 +153,7 @@ private fun InfoKiniStudioV2() {
                         "Redaktur", "AI Redaktur" -> EditorialScreen()
                         "Narasi / TTS" -> TtsScreen()
                         "Grafis Olahraga", "Berita Olahraga" -> SportsScreen()
+                        "Template Berita" -> TemplateScreen(onApply = { title, line -> headline = title; ticker = line; selected = "Video" })
                         "Lainnya" -> MoreScreen(onOpen = { module ->
                             selected = when (module) {
                                 "Live Studio" -> "Live"
@@ -161,6 +162,8 @@ private fun InfoKiniStudioV2() {
                                 "AI Redaktur" -> "Redaktur"
                                 "Narasi / TTS" -> "Narasi / TTS"
                                 "Grafis Olahraga", "Berita Olahraga" -> "Grafis Olahraga"
+                                "Template Berita" -> "Template Berita"
+                                "Promosi UMKM" -> "Promosi UMKM"
                                 else -> module
                             }
                         })
@@ -1175,6 +1178,41 @@ private fun MoreScreen(onOpen: (String) -> Unit) {
     ) {
         items(modules) { module -> ModuleCard(module) { onOpen(module.title) } }
         item { Text("Pilih modul untuk membuka ruang kerjanya.", color = Muted, fontSize = 11.sp) }
+    }
+}
+
+@Composable
+private fun TemplateScreen(onApply: (String, String) -> Unit) {
+    val presets = listOf(
+        Triple("Breaking News", "BREAKING NEWS", "INFO TERKINI | PERKEMBANGAN BERITA TERBARU"),
+        Triple("Berita Daerah", "KABAR DAERAH", "INFO WILAYAH | FAKTA, DATA, DAN KONFIRMASI"),
+        Triple("Olahraga", "INFO OLAHRAGA", "HASIL PERTANDINGAN | SKOR DAN KABAR TERKINI"),
+        Triple("Promosi UMKM", "PRODUK LOKAL UNGGULAN", "DUKUNG UMKM DAERAH | PRODUK ASLI INDONESIA")
+    )
+    var chosen by remember { mutableStateOf(0) }
+    Column(
+        Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("TEMPLATE BERITA INFOKINI", color = Cyan, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        Text("Pilih paket judul dan running text. Setelah diterapkan, Anda akan dibawa ke Video Studio untuk melanjutkan penyuntingan.", color = Muted, fontSize = 12.sp)
+        presets.forEachIndexed { index, preset ->
+            Card(
+                onClick = { chosen = index },
+                colors = CardDefaults.cardColors(containerColor = if (chosen == index) Color(0xFF173B5C) else Panel),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(preset.first, color = if (chosen == index) Cyan else SoftWhite, fontWeight = FontWeight.Bold)
+                    Text(preset.second, color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                    Text(preset.third, color = Muted, fontSize = 11.sp)
+                }
+            }
+        }
+        Button(onClick = { onApply(presets[chosen].second, presets[chosen].third) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Gunakan template di Video Studio")
+        }
+        Text("Template ini mengisi judul dan running text awal. Logo, gambar, warna lanjutan, dan animasi dapat disesuaikan pada tahap pengembangan berikutnya.", color = Muted, fontSize = 11.sp)
     }
 }
 
