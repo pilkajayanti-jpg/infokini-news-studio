@@ -615,7 +615,31 @@ private fun VideoStudioScreen(
 ) {
     val context = LocalContext.current
     var showTemplateLibrary by remember { mutableStateOf(showTemplateLibraryInitially) }
-    var videoSegments by remember { mutableStateOf<List<VideoSegment>>(emptyList()) }
+    var videoSegments by remember(context) {
+        mutableStateOf(
+            VideoDraftStore.load(context).map { saved ->
+                VideoSegment(
+                    uri = Uri.parse(saved.uri),
+                    startSeconds = saved.startSeconds,
+                    endSeconds = saved.endSeconds,
+                    durationMs = saved.durationMs
+                )
+            }
+        )
+    }
+    LaunchedEffect(videoSegments) {
+        VideoDraftStore.save(
+            context,
+            videoSegments.map { segment ->
+                SavedVideoClip(
+                    uri = segment.uri.toString(),
+                    startSeconds = segment.startSeconds,
+                    endSeconds = segment.endSeconds,
+                    durationMs = segment.durationMs
+                )
+            }
+        )
+    }
     var selectedClipIndex by remember { mutableStateOf(0) }
     val previewUri = videoSegments.getOrNull(selectedClipIndex)?.uri
     val previewStartMs = (videoSegments.getOrNull(selectedClipIndex)?.startSeconds?.toLongOrNull() ?: 0L).coerceAtLeast(0L) * 1000L
