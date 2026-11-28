@@ -1322,16 +1322,23 @@ private fun EditorialScreen() {
 @Composable
 private fun TtsScreen() {
     val context = LocalContext.current
-    var script by remember { mutableStateOf("") }
+    val prefs = remember(context) { context.getSharedPreferences("infokini_tts_v2", 0) }
+    var script by remember { mutableStateOf(prefs.getString("script", "").orEmpty()) }
     var engine by remember { mutableStateOf<TextToSpeech?>(null) }
+    var engineReady by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Menyiapkan mesin suara perangkat…") }
+
+    LaunchedEffect(script) {
+        prefs.edit().putString("script", script).apply()
+    }
 
     DisposableEffect(context) {
         val tts = TextToSpeech(context) { result ->
-            if (result == TextToSpeech.SUCCESS) {
-                status = "Mesin TTS siap; ketersediaan suara Indonesia akan diperiksa saat mulai membaca"
+            engineReady = result == TextToSpeech.SUCCESS
+            status = if (engineReady) {
+                "Mesin TTS siap; ketersediaan suara Indonesia akan diperiksa saat mulai membaca"
             } else {
-                status = "Mesin TTS tidak dapat diinisialisasi"
+                "Mesin TTS tidak dapat diinisialisasi"
             }
         }
         engine = tts
@@ -1339,6 +1346,7 @@ private fun TtsScreen() {
             tts.stop()
             tts.shutdown()
             engine = null
+            engineReady = false
         }
     }
 
@@ -1349,7 +1357,7 @@ private fun TtsScreen() {
         Text(status, color = Muted, fontSize = 11.sp)
         Button(onClick = {
             val tts = engine
-            if (tts != null && script.isNotBlank()) {
+            if (tts != null && engineReady && script.isNotBlank()) {
                 val result = tts.setLanguage(Locale("id", "ID"))
                 if (result >= TextToSpeech.LANG_AVAILABLE) {
                     tts.speak(script, TextToSpeech.QUEUE_FLUSH, null, "infokini-narration")
@@ -1358,9 +1366,13 @@ private fun TtsScreen() {
                     status = "Paket suara Bahasa Indonesia belum tersedia di perangkat"
                 }
             } else {
-                status = if (script.isBlank()) "Masukkan naskah terlebih dahulu" else "Mesin suara belum siap"
+                status = when {
+                    script.isBlank() -> "Masukkan naskah terlebih dahulu"
+                    !engineReady -> "Mesin suara masih disiapkan. Coba lagi sebentar."
+                    else -> "Mesin suara belum siap"
+                }
             }
-        }, modifier = Modifier.fillMaxWidth()) { Text("Bacakan naskah") }
+        }, modifier = Modifier.fillMaxWidth(), enabled = engineReady && script.isNotBlank()) { Text("Bacakan naskah") }
         OutlinedButton(onClick = { engine?.stop(); status = "Pembacaan dihentikan" }, modifier = Modifier.fillMaxWidth()) { Text("Hentikan suara") }
         Text("Catatan: fitur ini memutar suara melalui TTS Android. Ekspor audio menjadi MP3/WAV belum tersedia.", color = Muted, fontSize = 11.sp)
     }
