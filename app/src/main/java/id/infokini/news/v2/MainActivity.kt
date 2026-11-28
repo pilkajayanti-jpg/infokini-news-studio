@@ -127,10 +127,21 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun InfoKiniStudioV2() {
+    val context = LocalContext.current
+    val studioPrefs = remember(context) {
+        context.getSharedPreferences("infokini_studio_preferences_v2", android.content.Context.MODE_PRIVATE)
+    }
     var selected by remember { mutableStateOf("Beranda") }
-    var headline by remember { mutableStateOf("") }
-    var ticker by remember { mutableStateOf("INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
-    var videoTemplate by remember { mutableStateOf("Breaking News") }
+    var headline by remember { mutableStateOf(studioPrefs.getString("headline", "") ?: "") }
+    var ticker by remember { mutableStateOf(studioPrefs.getString("ticker", "INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") ?: "INFO KINI | BERPIKIR TAJAM, MENGUNGKAP KEBENARAN") }
+    var videoTemplate by remember { mutableStateOf(studioPrefs.getString("video_template", "Breaking News") ?: "Breaking News") }
+    LaunchedEffect(headline, ticker, videoTemplate) {
+        studioPrefs.edit()
+            .putString("headline", headline)
+            .putString("ticker", ticker)
+            .putString("video_template", videoTemplate)
+            .apply()
+    }
     val navigation = listOf("Beranda", "Live", "Video", "Foto", "Redaktur", "Lainnya")
 
     MaterialTheme(
